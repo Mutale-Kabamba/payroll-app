@@ -16,44 +16,44 @@
 }
 
 @layer components {
-  /* Modern button styles */
+  /* Simple button styles */
   .btn-primary {
-    @apply bg-blue-600 text-white px-6 py-3 rounded-xl font-medium transition-all duration-200 hover:bg-blue-700 hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-200 active:scale-95;
+    @apply bg-blue-600 text-white px-4 py-2 rounded font-medium transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500;
   }
   
   .btn-secondary {
-    @apply bg-white text-gray-700 px-6 py-3 rounded-xl font-medium border border-gray-200 transition-all duration-200 hover:bg-gray-50 hover:shadow-md hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-100 active:scale-95;
+    @apply bg-gray-100 text-gray-700 px-4 py-2 rounded font-medium border border-gray-300 transition-colors duration-200 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500;
   }
   
   .btn-danger {
-    @apply bg-red-500 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-red-600 hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-200 active:scale-95;
+    @apply bg-gray-100 text-gray-700 px-3 py-1 rounded border border-gray-300 transition-colors duration-200 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500;
   }
   
-  /* Modern card styles */
+  /* Simple card styles */
   .card {
-    @apply bg-white rounded-2xl shadow-lg border border-gray-100 transition-all duration-300 hover:shadow-xl hover:scale-[1.02];
+    @apply bg-white rounded border border-gray-300 shadow-sm;
   }
   
   .card-gradient {
-    @apply bg-white rounded-2xl shadow-lg border border-gray-100 transition-all duration-300 hover:shadow-xl hover:scale-[1.02];
+    @apply bg-white rounded border border-gray-300 shadow-sm;
   }
   
-  /* Modern input styles */
+  /* Simple input styles */
   .input-modern {
-    @apply w-full px-4 py-3 border border-gray-200 rounded-xl bg-white transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 hover:border-gray-300;
+    @apply w-full px-3 py-2 border border-gray-300 rounded transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
   }
   
-  /* Statistics card styles */
+  /* Statistics card styles - simple colored backgrounds */
   .stat-card-users {
-    @apply bg-blue-50 border border-blue-200 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:scale-[1.02];
+    @apply bg-blue-50 border border-gray-300 rounded p-6;
   }
   
   .stat-card-payroll {
-    @apply bg-green-50 border border-green-200 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:scale-[1.02];
+    @apply bg-green-50 border border-gray-300 rounded p-6;
   }
   
   .stat-card-period {
-    @apply bg-purple-50 border border-purple-200 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:scale-[1.02];
+    @apply bg-purple-50 border border-gray-300 rounded p-6;
   }
 }
 
