@@ -1192,6 +1192,104 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               onClick={() => {
                 // Check if there's data to print
                 if (payslips.length === 0) {
+                  alert('No payroll data available to preview. Please create some payslips first.');
+                  return;
+                }
+                
+                // Create print preview window
+                const reportElement = document.getElementById('wage-bill-report');
+                if (reportElement) {
+                  const printWindow = window.open('', '_blank', 'width=800,height=600');
+                  const reportHTML = reportElement.outerHTML;
+                  
+                  printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html lang="en">
+                    <head>
+                      <meta charset="UTF-8">
+                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                      <title>Wage Bill Report Preview - ${new Date().toLocaleDateString()}</title>
+                      <script src="https://cdn.tailwindcss.com"></script>
+                      <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+                        body { font-family: 'Inter', sans-serif; margin: 20px; }
+                        .no-print { display: none !important; }
+                        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+                        th { background-color: #f5f5f5; }
+                        .bg-blue-600, .bg-blue-800 { background-color: #1e40af !important; color: white !important; }
+                        .text-white { color: white !important; }
+                        .rounded-lg { border-radius: 8px; }
+                        .p-6 { padding: 24px; }
+                        .mb-2 { margin-bottom: 8px; }
+                        .mb-4 { margin-bottom: 16px; }
+                        .mb-6 { margin-bottom: 24px; }
+                        .text-2xl { font-size: 24px; }
+                        .text-lg { font-size: 18px; }
+                        .text-sm { font-size: 14px; }
+                        .font-bold { font-weight: bold; }
+                        .font-semibold { font-weight: 600; }
+                        .grid { display: grid; }
+                        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+                        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                        .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+                        .gap-4 { gap: 16px; }
+                        .gap-6 { gap: 24px; }
+                        .space-y-6 > * + * { margin-top: 24px; }
+                        .space-y-3 > * + * { margin-top: 12px; }
+                        .border { border: 1px solid #d1d5db; }
+                        .border-gray-300 { border-color: #d1d5db; }
+                        .bg-white { background-color: white; }
+                        .bg-gray-50 { background-color: #f9fafb; }
+                        .text-gray-900 { color: #111827; }
+                        .text-gray-600 { color: #4b5563; }
+                        .text-green-600 { color: #059669; }
+                        .text-red-600 { color: #dc2626; }
+                        .text-blue-600 { color: #2563eb; }
+                        .overflow-x-auto { overflow-x: auto; }
+                        .px-4 { padding-left: 16px; padding-right: 16px; }
+                        .py-3 { padding-top: 12px; padding-bottom: 12px; }
+                        .px-6 { padding-left: 24px; padding-right: 24px; }
+                        .py-4 { padding-top: 16px; padding-bottom: 16px; }
+                        .flex { display: flex; }
+                        .items-center { align-items: center; }
+                        .justify-between { justify-content: space-between; }
+                        .text-right { text-align: right; }
+                        .hover\\:bg-gray-50:hover { background-color: #f9fafb; }
+                        .divide-y > * + * { border-top: 1px solid #e5e7eb; }
+                        @media print {
+                          body { margin: 0; }
+                          .no-print { display: none !important; }
+                        }
+                      </style>
+                    </head>
+                    <body>
+                      <div style="text-align: center; margin-bottom: 20px;">
+                        <button onclick="window.print()" style="background: #1e40af; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
+                          🖨️ Print This Report
+                        </button>
+                        <button onclick="window.close()" style="background: #6b7280; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">
+                          ✕ Close Preview
+                        </button>
+                      </div>
+                      ${reportHTML}
+                    </body>
+                    </html>
+                  `);
+                  printWindow.document.close();
+                } else {
+                  alert('Report content not found. Please refresh and try again.');
+                }
+              }}
+              className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 transition-colors"
+            >
+              <FileText className="h-4 w-4" />
+              Print Preview
+            </button>
+            <button
+              onClick={() => {
+                // Check if there's data to print
+                if (payslips.length === 0) {
                   alert('No payroll data available to print. Please create some payslips first.');
                   return;
                 }
@@ -1219,60 +1317,6 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             >
               <Download className="h-4 w-4" />
               Print Report
-            </button>
-            <button
-              onClick={() => {
-                // Check if there's data to print
-                if (payslips.length === 0) {
-                  alert('No payroll data available for preview. Please create some payslips first.');
-                  return;
-                }
-                
-                // Open print preview
-                const printWindow = window.open('', '_blank');
-                const reportElement = document.getElementById('wage-bill-report');
-                
-                if (reportElement && printWindow) {
-                  const printContent = `
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                      <title>Wage Bill Report - Print Preview</title>
-                      <style>
-                        ${document.head.innerHTML}
-                        body { font-family: Inter, sans-serif; margin: 20px; }
-                        .no-print { display: none !important; }
-                        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-                        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
-                        th { background-color: #f5f5f5; }
-                        .bg-blue-600, .bg-blue-800 { background-color: #1e40af; color: white; padding: 10px; }
-                        .text-white { color: white; }
-                        .rounded-lg { border-radius: 8px; }
-                        .mb-2 { margin-bottom: 8px; }
-                        .mb-4 { margin-bottom: 16px; }
-                        .p-6 { padding: 24px; }
-                        .grid { display: grid; }
-                        .gap-4 { gap: 16px; }
-                        .md\\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
-                        .lg\\:grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
-                      </style>
-                    </head>
-                    <body>
-                      ${reportElement.innerHTML}
-                    </body>
-                    </html>
-                  `;
-                  
-                  printWindow.document.write(printContent);
-                  printWindow.document.close();
-                } else {
-                  alert('Unable to generate print preview. Please try again.');
-                }
-              }}
-              className="bg-purple-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-purple-700 transition-colors"
-            >
-              <FileText className="h-4 w-4" />
-              Print Preview
             </button>
             <button
               onClick={() => {
