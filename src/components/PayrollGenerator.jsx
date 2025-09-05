@@ -1189,11 +1189,90 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Export Options</h3>
           <div className="flex flex-wrap gap-4">
             <button
-              onClick={() => window.print()}
+              onClick={() => {
+                // Check if there's data to print
+                if (payslips.length === 0) {
+                  alert('No payroll data available to print. Please create some payslips first.');
+                  return;
+                }
+                
+                // Ensure the report content is visible before printing
+                const reportElement = document.getElementById('wage-bill-report');
+                if (reportElement) {
+                  // Set document title for print
+                  const originalTitle = document.title;
+                  document.title = `Wage Bill Report - ${new Date().toLocaleDateString()}`;
+                  
+                  // Add a small delay to ensure styles are applied
+                  setTimeout(() => {
+                    window.print();
+                    // Restore original title after printing
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 1000);
+                  }, 100);
+                } else {
+                  alert('Report content not found. Please refresh and try again.');
+                }
+              }}
               className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700 transition-colors"
             >
               <Download className="h-4 w-4" />
               Print Report
+            </button>
+            <button
+              onClick={() => {
+                // Check if there's data to print
+                if (payslips.length === 0) {
+                  alert('No payroll data available for preview. Please create some payslips first.');
+                  return;
+                }
+                
+                // Open print preview
+                const printWindow = window.open('', '_blank');
+                const reportElement = document.getElementById('wage-bill-report');
+                
+                if (reportElement && printWindow) {
+                  const printContent = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <title>Wage Bill Report - Print Preview</title>
+                      <style>
+                        ${document.head.innerHTML}
+                        body { font-family: Inter, sans-serif; margin: 20px; }
+                        .no-print { display: none !important; }
+                        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+                        th { background-color: #f5f5f5; }
+                        .bg-blue-600, .bg-blue-800 { background-color: #1e40af; color: white; padding: 10px; }
+                        .text-white { color: white; }
+                        .rounded-lg { border-radius: 8px; }
+                        .mb-2 { margin-bottom: 8px; }
+                        .mb-4 { margin-bottom: 16px; }
+                        .p-6 { padding: 24px; }
+                        .grid { display: grid; }
+                        .gap-4 { gap: 16px; }
+                        .md\\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+                        .lg\\:grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+                      </style>
+                    </head>
+                    <body>
+                      ${reportElement.innerHTML}
+                    </body>
+                    </html>
+                  `;
+                  
+                  printWindow.document.write(printContent);
+                  printWindow.document.close();
+                } else {
+                  alert('Unable to generate print preview. Please try again.');
+                }
+              }}
+              className="bg-purple-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-purple-700 transition-colors"
+            >
+              <FileText className="h-4 w-4" />
+              Print Preview
             </button>
             <button
               onClick={() => {

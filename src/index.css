@@ -57,12 +57,14 @@
   }
 }
 
-/* Custom print styles for payslips */
+/* Custom print styles for payslips and reports */
 @media print {
+  /* Hide everything by default */
   body * {
     visibility: hidden;
   }
   
+  /* Show only printable content */
   #payslip,
   #payslip *,
   #wage-bill-report,
@@ -70,48 +72,86 @@
     visibility: visible;
   }
   
+  /* Position printable content */
   #payslip,
   #wage-bill-report {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
+    background: white;
   }
   
-  .no-print {
+  /* Hide elements marked as no-print */
+  .no-print,
+  .no-print * {
     display: none !important;
+    visibility: hidden !important;
   }
   
-  /* Additional print styles for reports */
+  /* Page setup */
   @page {
     margin: 0.5in;
     size: A4;
   }
   
+  /* Reset some styles for print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
   /* Ensure tables don't break awkwardly */
   table {
     page-break-inside: avoid;
+    width: 100% !important;
   }
   
   tr {
     page-break-inside: avoid;
   }
   
-  /* Hide interactive elements in print */
-  button:not(.print-visible) {
+  thead {
+    display: table-header-group;
+  }
+  
+  tfoot {
+    display: table-footer-group;
+  }
+  
+  /* Hide all buttons except specifically marked ones */
+  button {
     display: none !important;
   }
   
-  /* Adjust colors for print */
+  /* Adjust text sizes for print */
+  h1 { font-size: 18pt !important; }
+  h2 { font-size: 16pt !important; }
+  h3 { font-size: 14pt !important; }
+  
+  /* Ensure backgrounds are visible */
   .bg-blue-600,
-  .bg-blue-800 {
-    background-color: #1e40af !important;
+  .bg-blue-800,
+  .bg-gradient-to-r {
+    background: #1e40af !important;
     color: white !important;
   }
   
+  .bg-gray-50 {
+    background: #f9fafb !important;
+  }
+  
   /* Ensure borders are visible in print */
-  .border {
+  .border,
+  .border-gray-300 {
     border: 1px solid #d1d5db !important;
+  }
+  
+  /* Force text to be black for readability */
+  .text-gray-900,
+  .text-gray-800,
+  .text-gray-700 {
+    color: #000 !important;
   }
 }
 
