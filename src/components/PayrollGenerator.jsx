@@ -971,7 +971,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     const analytics = wageBillAnalytics();
 
     return (
-      <div className="space-y-6">
+      <div id="wage-bill-report" className="space-y-6">
         {/* Report Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-lg p-6">
           <div className="flex items-center justify-between">
@@ -1185,7 +1185,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         )}
 
         {/* Export Options */}
-        <div className="bg-white rounded-lg border border-gray-300 p-6">
+        <div className="bg-white rounded-lg border border-gray-300 p-6 no-print">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Export Options</h3>
           <div className="flex flex-wrap gap-4">
             <button
@@ -1216,7 +1216,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
         {/* No Data Message */}
         {payslips.length === 0 && (
-          <div className="bg-white rounded-lg border border-gray-300 p-12 text-center">
+          <div className="bg-white rounded-lg border border-gray-300 p-12 text-center no-print">
             <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Payroll Data Available</h3>
             <p className="text-gray-600 mb-6">Create some payslips to generate comprehensive wage bill reports.</p>
