@@ -502,6 +502,7 @@ const PayrollGenerator = () => {
     if (!selectedEmployee) return null;
 
     return (
+    
       <div className="max-w-5xl mx-auto animate-fade-in">
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print">
           <button
