@@ -327,6 +327,8 @@ class DatabaseService {
     localStorage.removeItem(this.getStorageKey('employees'));
     localStorage.removeItem(this.getStorageKey('payslips'));
     localStorage.removeItem(this.getStorageKey('payroll_settings'));
+    // Clear the initialization flag so user can get defaults again if needed
+    localStorage.removeItem(`${this.storagePrefix}initialized`);
   }
 
   // Get storage usage information
