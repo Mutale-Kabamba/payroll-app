@@ -2534,7 +2534,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         
         {/* Employee Management */}
         <div className="bg-white p-6 rounded border border-gray-200 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
+          <div className="space-y-4 sm:space-y-0 sm:flex sm:justify-between sm:items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-800 flex items-center">
               <Users className="mr-2 text-blue-600" />
               Employee Management
@@ -2800,7 +2800,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                 className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors flex items-center gap-2"
               >
                 <Download className="h-4 w-4" />
-                Export Backup
+                Export
               </button>
             </div>
 
@@ -2825,7 +2825,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
-                  Import Backup
+                  Import
                 </label>
               </div>
             </div>
@@ -2841,7 +2841,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                 className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors flex items-center gap-2"
               >
                 <Trash2 className="h-4 w-4" />
-                Clear Data
+                Clear
               </button>
             </div>
           </div>
