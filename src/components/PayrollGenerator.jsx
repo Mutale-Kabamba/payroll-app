@@ -496,7 +496,6 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     }
     
     showConfirm(
-      'Delete Payslip',
       'Are you sure you want to delete this payslip? This action cannot be undone.',
       async () => {
         try {
@@ -523,6 +522,12 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           closeModal('confirm');
           showError('Failed to delete payslip. Please try again.');
         }
+      },
+      {
+        title: 'Delete Payslip',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        danger: true
       }
     );
   };
@@ -2992,9 +2997,8 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             modals.confirm.onConfirm();
           } else {
             console.log('No onConfirm function found!');
+            closeModal('confirm');
           }
-          console.log('Closing confirm modal...');
-          closeModal('confirm');
         }}
         title={modals.confirm.title}
         message={modals.confirm.message}

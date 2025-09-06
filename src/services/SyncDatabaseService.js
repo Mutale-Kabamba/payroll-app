@@ -85,10 +85,41 @@ class SyncDatabaseService {
   async getEmployees() {
     try {
       if (this.isOnline) {
-        const cloudEmployees = await this.cloudService.getEmployees();
-        // Update local storage with cloud data
-        this.localService.setEmployees(cloudEmployees);
-        return cloudEmployees;
+        try {
+          const cloudEmployees = await this.cloudService.getEmployees();
+          // Only update local storage with cloud data if cloud has data OR local is empty
+          const localEmployees = this.localService.getEmployees();
+          if (cloudEmployees.length > 0) {
+            this.localService.setEmployees(cloudEmployees);
+            return cloudEmployees;
+          } else if (localEmployees.length > 0) {
+            // Cloud is empty but local has data, use local and sync to cloud
+            try {
+              for (const employee of localEmployees) {
+                await this.cloudService.addEmployee(employee);
+              }
+            } catch (syncError) {
+              console.log('Failed to sync local employees to cloud:', syncError);
+            }
+            return localEmployees;
+          } else {
+            // Both cloud and local are empty, let local service initialize defaults
+            this.localService.initializeDatabase();
+            const initializedEmployees = this.localService.getEmployees();
+            // Try to sync initialized data to cloud
+            try {
+              for (const employee of initializedEmployees) {
+                await this.cloudService.addEmployee(employee);
+              }
+            } catch (syncError) {
+              console.log('Failed to sync initialized employees to cloud:', syncError);
+            }
+            return initializedEmployees;
+          }
+        } catch (cloudError) {
+          console.error('Cloud service error, falling back to local:', cloudError);
+          return this.localService.getEmployees();
+        }
       } else {
         return this.localService.getEmployees();
       }
