@@ -1,124 +1,15 @@
-import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Download, Calculator, Users, FileText, Menu, X, BarChart3, TrendingUp, DollarSign, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit2, Trash2, Download, Calculator, Users, FileText, Menu, X, BarChart3, TrendingUp, DollarSign, Calendar, LogOut, User } from 'lucide-react';
+import databaseService from '../services/DatabaseService';
+import { SuccessModal, ErrorModal, ConfirmModal, InfoModal } from './Modal';
+import LoadingModal from './LoadingModal';
+import { useNotification } from '../hooks/useNotification';
 
-const PayrollGenerator = () => {
-// Employee Database - This would typically come from a backend
-const [employeeDatabase, setEmployeeDatabase] = useState([
-    {
-        id: 'LEW001',
-        name: 'LESA LEWIS',
-        nrc: '217589/68/1',
-        ssn: '911834888',
-        gender: 'Male',
-        designation: 'DRIVER',
-        dateOfJoining: '1973-12-05',
-        basicPay: 3000.00,
-        transportAllowance: 200.00,
-        mealAllowance: 0,
-        address: 'C153 Linda - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '911834888',
-        nhima: '233266971110112'
-    },
-    {
-        id: 'WIN002',
-        name: 'KASENGA WINTER',
-        nrc: '633347/11/1',
-        ssn: '208975378',
-        gender: 'Male',
-        designation: 'DRIVER',
-        dateOfJoining: '1976-05-20',
-        basicPay: 3000.00,
-        transportAllowance: 200.00,
-        mealAllowance: 0,
-        address: '121 Dambwa North - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '208975378',
-        nhima: '233282691110119'
-    },
-    {
-        id: 'HAR003',
-        name: 'NDHLOVU HARRISON',
-        nrc: '231690/7/1',
-        ssn: '905369104',
-        gender: 'Male',
-        designation: 'GENERAL WORKER',
-        dateOfJoining: '1986-03-05',
-        basicPay: 1500.00,
-        transportAllowance: 150.00,
-        mealAllowance: 0,
-        address: 'C31 Linda - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '905369104',
-        nhima: '233282601110116'
-    },
-    {
-        id: 'CHI004',
-        name: 'KANEKWA CHIMBUNYA ISAAC',
-        nrc: '328165/71/1',
-        ssn: '941778636',
-        gender: 'Male',
-        designation: 'GENERAL WORKER',
-        dateOfJoining: '1998-12-10',
-        basicPay: 1500.00,
-        transportAllowance: 150.00,
-        mealAllowance: 0,
-        address: 'C75 Maramba - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '941778636',
-        nhima: '233296321110141'
-    },
-    {
-        id: 'ABR005',
-        name: 'KANG\'OTI BYEMBA ABRAHAM',
-        nrc: '198290/84/1',
-        ssn: '',
-        gender: 'Male',
-        designation: 'GENERAL WORKER',
-        dateOfJoining: '1969-08-18',
-        basicPay: 700.00,
-        transportAllowance: 100.00,
-        mealAllowance: 0,
-        address: '2670 Senanga Rd - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '',
-        nhima: ''
-    },
-    {
-        id: 'KAB006',
-        name: 'MUTALE KABAMBA',
-        nrc: '317029/68/1',
-        ssn: '320434124',
-        gender: 'Male',
-        designation: 'MANAGER',
-        dateOfJoining: '1998-04-03',
-        basicPay: 4000.00,
-        transportAllowance: 300.00,
-        mealAllowance: 200.00,
-        address: '10A Off Natwange Road - Livingstone',
-        department: 'IT & ACCOUNTS',
-        napsa: '320434124',
-        nhima: '322002911110110'
-    },
-    {
-        id: 'DAN007',
-        name: 'MWAANGA MWALE M. DANIEL',
-        nrc: '510487/71/1',
-        ssn: '912775251',
-        gender: 'Male',
-        designation: 'DRIVER',
-        dateOfJoining: '',
-        basicPay: 1500.00,
-        transportAllowance: 200.00,
-        mealAllowance: 0,
-        address: '',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '912775251',
-        nhima: '219861681110117'
-    }
-]);
+const PayrollGenerator = ({ user, onLogout }) => {
+// Employee Database - loaded from persistent storage
+const [employeeDatabase, setEmployeeDatabase] = useState([]);
 
-// Payslips - tracks created payslips
+// Payslips - loaded from persistent storage
 const [payslips, setPayslips] = useState([]);
 
 const [currentView, setCurrentView] = useState('dashboard');
@@ -130,6 +21,42 @@ const [payrollData, setPayrollData] = useState({
     workedDays: 26,
     totalDays: 30
 });
+
+// Notification hook for beautiful modals
+const { modals, showSuccess, showError, showConfirm, showInfo, showLoading, hideLoading, closeModal } = useNotification();
+
+// Load data from database on component mount
+useEffect(() => {
+    try {
+        // Load employees from database
+        const employees = databaseService.getEmployees();
+        setEmployeeDatabase(employees);
+
+        // Load payslips from database
+        const savedPayslips = databaseService.getPayslips();
+        setPayslips(savedPayslips);
+
+        // Load payroll settings from database
+        const settings = databaseService.getPayrollSettings();
+        setPayrollData(prevData => ({
+            ...prevData,
+            payPeriod: settings.payPeriod || prevData.payPeriod,
+            workedDays: settings.workedDays || prevData.workedDays,
+            totalDays: settings.totalDays || prevData.totalDays
+        }));
+    } catch (error) {
+        console.error('Error loading data from database:', error);
+    }
+}, []);
+
+// Save payroll settings whenever they change
+useEffect(() => {
+    try {
+        databaseService.setPayrollSettings(payrollData);
+    } catch (error) {
+        console.error('Error saving payroll settings:', error);
+    }
+}, [payrollData]);
 
 const payPeriodOptions = [
     'January 2024', 'February 2024', 'March 2024', 'April 2024', 'May 2024', 'June 2024',
@@ -174,8 +101,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
   const addPayslip = () => {
     if (newPayslip.employeeId) {
-      const employee = employeeDatabase.find(emp => emp.id === newPayslip.employeeId);
-      if (employee) {
+      try {
+        const employee = employeeDatabase.find(emp => emp.id === newPayslip.employeeId);
+        if (!employee) {
+          showError('Employee not found! Please select a valid employee.');
+          return;
+        }
+
         const payslipData = {
           ...employee,
           payrollPeriod: payrollData.payPeriod,
@@ -185,13 +117,26 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           otherDeductions: newPayslip.otherDeductions,
           createdAt: new Date().toISOString()
         };
-        setPayslips([...payslips, payslipData]);
+
+        // Save to database
+        databaseService.addPayslip(payslipData);
+        
+        // Update local state
+        const updatedPayslips = databaseService.getPayslips();
+        setPayslips(updatedPayslips);
+        
+        // Reset form
         setNewPayslip({
           employeeId: '',
           otherEarnings: [],
           otherDeductions: []
         });
+        
         setCurrentView('dashboard');
+        showSuccess(`Payslip for ${employee.name} has been created successfully!`, 'Payslip Created');
+      } catch (error) {
+        console.error('Error creating payslip:', error);
+        showError(`Failed to create payslip: ${error.message}`, 'Creation Failed');
       }
     }
   };
@@ -234,8 +179,35 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     setNewPayslip({ ...newPayslip, otherDeductions: updatedDeductions });
   };
 
-  const deletePayslip = (index) => {
-    setPayslips(payslips.filter((_, i) => i !== index));
+  const deletePayslip = (payslipId) => {
+    const payslip = payslips.find(p => p.id === payslipId);
+    const employeeName = payslip ? payslip.name : 'Unknown Employee';
+    
+    showConfirm(
+      `Are you sure you want to delete the payslip for ${employeeName}? This action cannot be undone.`,
+      () => {
+        try {
+          // Delete from database
+          databaseService.deletePayslip(payslipId);
+          
+          // Update local state
+          const updatedPayslips = databaseService.getPayslips();
+          setPayslips(updatedPayslips);
+          
+          showSuccess(`Payslip for ${employeeName} has been deleted successfully.`, 'Payslip Deleted');
+        } catch (error) {
+          console.error('Error deleting payslip:', error);
+          showError(`Failed to delete payslip: ${error.message}`, 'Deletion Failed');
+        }
+        closeModal('confirm');
+      },
+      {
+        title: 'Delete Payslip',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        danger: true
+      }
+    );
   };
 
   const generatePayslip = (payslipData) => {
@@ -250,7 +222,9 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
     const thousands = ['', 'Thousand', 'Million', 'Billion'];
 
-    if (num === 0) return 'Zero Kwacha';
+    if (num === 0) {
+      return 'Zero Kwacha';
+    }
 
     const convertHundreds = (n) => {
       let result = '';
@@ -421,7 +395,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               <button
                 onClick={() => {
                   if (payslips.length === 0) {
-                    alert('No payslips to export');
+                    showInfo('No payslips have been created yet. Please create some payslips first before exporting.', 'No Payslips to Export');
                     return;
                   }
                   // Generate and export all payslips as PDF
@@ -791,7 +765,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                           </svg>
                         </button>
                         <button
-                          onClick={() => deletePayslip(index)}
+                          onClick={() => deletePayslip(payslip.id)}
                           className="inline-flex items-center px-2 py-1 border border-red-300 shadow-sm text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-red-500 transition-colors"
                           title="Delete Payslip"
                         >
@@ -1585,7 +1559,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               onClick={() => {
                 // Check if there's data to print
                 if (payslips.length === 0) {
-                  alert('No payroll data available to preview. Please create some payslips first.');
+                  showInfo('No payroll data is available to preview. Please create some payslips first before generating reports.', 'No Data Available');
                   return;
                 }
                 
@@ -1982,7 +1956,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               onClick={() => {
                 // Check if there's data to print
                 if (payslips.length === 0) {
-                  alert('No payroll data available to print. Please create some payslips first.');
+                  showInfo('No payroll data is available to print. Please create some payslips first before printing reports.', 'No Data Available');
                   return;
                 }
                 
@@ -2365,36 +2339,380 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     );
   };
 
+  const renderDataManagement = () => {
+    const handleExportData = () => {
+      try {
+        const data = databaseService.exportAllData();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `payroll_backup_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showSuccess('Your payroll data has been exported successfully! The backup file has been downloaded.', 'Data Exported');
+      } catch (error) {
+        console.error('Error exporting data:', error);
+        showError(`Failed to export data: ${error.message}`, 'Export Failed');
+      }
+    };
+
+    const handleImportData = (event) => {
+      const file = event.target.files[0];
+      if (!file) {
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          
+          showConfirm(
+            'This will replace all existing data with the data from the backup file. Your current employees, payslips, and settings will be permanently overwritten. Are you sure you want to continue?',
+            () => {
+              try {
+                databaseService.importAllData(data);
+                
+                // Refresh local state
+                setEmployeeDatabase(databaseService.getEmployees());
+                setPayslips(databaseService.getPayslips());
+                setPayrollData(databaseService.getPayrollSettings());
+                
+                showSuccess('Your backup data has been imported successfully! All data has been restored.', 'Data Imported');
+                closeModal('confirm');
+              } catch (importError) {
+                console.error('Error during import:', importError);
+                showError(`Failed to import data: ${importError.message}`, 'Import Failed');
+                closeModal('confirm');
+              }
+            },
+            {
+              title: 'Import Backup Data',
+              confirmText: 'Replace All Data',
+              cancelText: 'Cancel',
+              danger: true
+            }
+          );
+        } catch (error) {
+          console.error('Error parsing backup file:', error);
+          showError('The selected file is not a valid backup file. Please choose a valid JSON backup file.', 'Invalid Backup File');
+        }
+      };
+      reader.readAsText(file);
+      
+      // Reset the file input
+      event.target.value = '';
+    };
+
+    const handleClearData = () => {
+      showConfirm(
+        'This will permanently delete ALL your data including employees, payslips, and settings. This action cannot be undone and will reset the system to its default state. Are you absolutely sure you want to continue?',
+        () => {
+          showConfirm(
+            'FINAL WARNING: You are about to delete everything. This is your last chance to cancel. Do you really want to delete all data?',
+            () => {
+              try {
+                databaseService.clearAllData();
+                
+                // Reset to initial state
+                databaseService.initializeDatabase();
+                setEmployeeDatabase(databaseService.getEmployees());
+                setPayslips(databaseService.getPayslips());
+                setPayrollData(databaseService.getPayrollSettings());
+                
+                showSuccess('All data has been cleared successfully. The system has been reset to its default state.', 'Data Cleared');
+                closeModal('confirm');
+              } catch (error) {
+                console.error('Error clearing data:', error);
+                showError(`Failed to clear data: ${error.message}`, 'Clear Failed');
+                closeModal('confirm');
+              }
+            },
+            {
+              title: 'Final Confirmation',
+              confirmText: 'Yes, Delete Everything',
+              cancelText: 'Cancel',
+              danger: true
+            }
+          );
+          closeModal('confirm');
+        },
+        {
+          title: 'Clear All Data',
+          confirmText: 'Continue',
+          cancelText: 'Cancel',
+          danger: true
+        }
+      );
+    };
+
+    const storageInfo = databaseService.getStorageInfo();
+
+    return (
+      <div className="space-y-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-6">Data Management</h2>
+        
+        {/* Storage Information */}
+        <div className="bg-white p-6 rounded border border-gray-200 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Storage Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Employees</p>
+              <p className="text-xl font-bold text-blue-600">{storageInfo.employeeCount}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Payslips</p>
+              <p className="text-xl font-bold text-green-600">{storageInfo.payslipCount}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Storage Used</p>
+              <p className="text-xl font-bold text-purple-600">{(storageInfo.storageUsed / 1024).toFixed(2)} KB</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Data Operations */}
+        <div className="bg-white p-6 rounded border border-gray-200 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Data Operations</h3>
+          <div className="space-y-4">
+            
+            {/* Export Data */}
+            <div className="flex items-center justify-between p-4 bg-green-50 rounded border border-green-200">
+              <div>
+                <h4 className="font-semibold text-green-800">Export Data</h4>
+                <p className="text-sm text-green-600">Download a backup of all your data</p>
+              </div>
+              <button
+                onClick={handleExportData}
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export Backup
+              </button>
+            </div>
+
+            {/* Import Data */}
+            <div className="flex items-center justify-between p-4 bg-blue-50 rounded border border-blue-200">
+              <div>
+                <h4 className="font-semibold text-blue-800">Import Data</h4>
+                <p className="text-sm text-blue-600">Restore data from a backup file</p>
+              </div>
+              <div>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportData}
+                  className="hidden"
+                  id="import-file"
+                />
+                <label
+                  htmlFor="import-file"
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors cursor-pointer flex items-center gap-2"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Import Backup
+                </label>
+              </div>
+            </div>
+
+            {/* Clear Data */}
+            <div className="flex items-center justify-between p-4 bg-red-50 rounded border border-red-200">
+              <div>
+                <h4 className="font-semibold text-red-800">Clear All Data</h4>
+                <p className="text-sm text-red-600">Permanently delete all data and reset to defaults</p>
+              </div>
+              <button
+                onClick={handleClearData}
+                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Clear Data
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Search & Analytics */}
+        <div className="bg-white p-6 rounded border border-gray-200 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Search</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Search Employees</label>
+              <input
+                type="text"
+                placeholder="Search by name, ID, designation, or department..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => {
+                  const results = databaseService.searchEmployees(e.target.value);
+                  console.log('Employee search results:', results);
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Search Payslips</label>
+              <input
+                type="text"
+                placeholder="Search by employee name, ID, or pay period..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => {
+                  const results = databaseService.searchPayslips(e.target.value);
+                  console.log('Payslip search results:', results);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Simple Header */}
+      {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <h1 className="text-2xl font-bold text-gray-900">Payroll Management System</h1>
-            <nav className="flex space-x-4">
+            
+            <div className="flex items-center space-x-4">
+              {/* Mobile menu button */}
               <button
-                onClick={() => setCurrentView('dashboard')}
-                className={`px-4 py-2 rounded font-medium transition-colors ${
-                  currentView === 'dashboard' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                Dashboard
+                {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
-              <button
-                onClick={() => setCurrentView('reports')}
-                className={`px-4 py-2 rounded font-medium transition-colors ${
-                  currentView === 'reports' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-              >
-                Wage Bill Reports
-              </button>
-            </nav>
+
+              {/* Navigation */}
+              <nav className="hidden md:flex space-x-4">
+                <button
+                  onClick={() => setCurrentView('dashboard')}
+                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                    currentView === 'dashboard' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => setCurrentView('reports')}
+                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                    currentView === 'reports' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  Wage Bill Reports
+                </button>
+                <button
+                  onClick={() => setCurrentView('dataManagement')}
+                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                    currentView === 'dataManagement' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  Data Management
+                </button>
+              </nav>
+
+              {/* User Menu */}
+              <div className="relative group">
+                <div className="flex items-center space-x-3 cursor-pointer p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div className="hidden sm:block text-right">
+                    <p className="text-sm font-medium text-gray-900">{user?.username || 'User'}</p>
+                    <p className="text-xs text-gray-500">{user?.role || 'Role'}</p>
+                  </div>
+                </div>
+                
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="p-2">
+                    <div className="px-3 py-2 border-b border-gray-100">
+                      <p className="text-sm font-medium text-gray-900">{user?.username}</p>
+                      <p className="text-xs text-gray-500">{user?.role}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        showConfirm(
+                          'Are you sure you want to log out?',
+                          () => {
+                            onLogout();
+                            closeModal('confirm');
+                          },
+                          {
+                            title: 'Confirm Logout',
+                            confirmText: 'Logout',
+                            cancelText: 'Cancel'
+                          }
+                        );
+                      }}
+                      className="w-full flex items-center px-3 py-2 text-sm text-red-700 hover:bg-red-50 rounded transition-colors mt-1"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Mobile Navigation Menu */}
+          {isMobileMenuOpen && (
+            <div className="md:hidden border-t border-gray-200 bg-white">
+              <div className="px-4 py-2 space-y-1">
+                <button
+                  onClick={() => {
+                    setCurrentView('dashboard');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded font-medium transition-colors ${
+                    currentView === 'dashboard' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentView('reports');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded font-medium transition-colors ${
+                    currentView === 'reports' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  Wage Bill Reports
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentView('dataManagement');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded font-medium transition-colors ${
+                    currentView === 'dataManagement' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  Data Management
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2404,7 +2722,47 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         {currentView === 'addPayslip' && renderAddPayslip()}
         {currentView === 'payslip' && renderPayslip()}
         {currentView === 'reports' && renderReports()}
+        {currentView === 'dataManagement' && renderDataManagement()}
       </div>
+
+      {/* Beautiful Notification Modals */}
+      <SuccessModal
+        isOpen={modals.success.isOpen}
+        onClose={() => closeModal('success')}
+        title={modals.success.title}
+        message={modals.success.message}
+      />
+
+      <ErrorModal
+        isOpen={modals.error.isOpen}
+        onClose={() => closeModal('error')}
+        title={modals.error.title}
+        message={modals.error.message}
+      />
+
+      <ConfirmModal
+        isOpen={modals.confirm.isOpen}
+        onClose={() => closeModal('confirm')}
+        onConfirm={modals.confirm.onConfirm}
+        title={modals.confirm.title}
+        message={modals.confirm.message}
+        confirmText={modals.confirm.confirmText}
+        cancelText={modals.confirm.cancelText}
+        danger={modals.confirm.danger}
+      />
+
+      <InfoModal
+        isOpen={modals.info.isOpen}
+        onClose={() => closeModal('info')}
+        title={modals.info.title}
+        message={modals.info.message}
+      />
+
+      <LoadingModal
+        isOpen={modals.loading.isOpen}
+        title={modals.loading.title}
+        message={modals.loading.message}
+      />
     </div>
   );
 };
