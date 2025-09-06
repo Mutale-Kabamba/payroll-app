@@ -2985,7 +2985,17 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       <ConfirmModal
         isOpen={modals.confirm.isOpen}
         onClose={() => closeModal('confirm')}
-        onConfirm={modals.confirm.onConfirm}
+        onConfirm={() => {
+          console.log('Confirm button clicked! onConfirm function:', modals.confirm.onConfirm);
+          if (modals.confirm.onConfirm) {
+            console.log('Executing onConfirm function...');
+            modals.confirm.onConfirm();
+          } else {
+            console.log('No onConfirm function found!');
+          }
+          console.log('Closing confirm modal...');
+          closeModal('confirm');
+        }}
         title={modals.confirm.title}
         message={modals.confirm.message}
         confirmText={modals.confirm.confirmText}
