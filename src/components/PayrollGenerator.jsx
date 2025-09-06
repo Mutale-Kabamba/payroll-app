@@ -1,125 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Download, Calculator, Users, FileText, Menu, X, BarChart3, TrendingUp, DollarSign, Calendar } from 'lucide-react';
+import databaseService from '../services/DatabaseService';
 
 const PayrollGenerator = () => {
-// Employee Database - This would typically come from a backend
-const [employeeDatabase, setEmployeeDatabase] = useState([
-    {
-        id: 'LEW001',
-        name: 'LESA LEWIS',
-        nrc: '217589/68/1',
-        ssn: '911834888',
-        gender: 'Male',
-        designation: 'DRIVER',
-        dateOfJoining: '1973-12-05',
-        basicPay: 3000.00,
-        transportAllowance: 200.00,
-        mealAllowance: 0,
-        address: 'C153 Linda - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '911834888',
-        nhima: '233266971110112'
-    },
-    {
-        id: 'WIN002',
-        name: 'KASENGA WINTER',
-        nrc: '633347/11/1',
-        ssn: '208975378',
-        gender: 'Male',
-        designation: 'DRIVER',
-        dateOfJoining: '1976-05-20',
-        basicPay: 3000.00,
-        transportAllowance: 200.00,
-        mealAllowance: 0,
-        address: '121 Dambwa North - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '208975378',
-        nhima: '233282691110119'
-    },
-    {
-        id: 'HAR003',
-        name: 'NDHLOVU HARRISON',
-        nrc: '231690/7/1',
-        ssn: '905369104',
-        gender: 'Male',
-        designation: 'GENERAL WORKER',
-        dateOfJoining: '1986-03-05',
-        basicPay: 1500.00,
-        transportAllowance: 150.00,
-        mealAllowance: 0,
-        address: 'C31 Linda - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '905369104',
-        nhima: '233282601110116'
-    },
-    {
-        id: 'CHI004',
-        name: 'KANEKWA CHIMBUNYA ISAAC',
-        nrc: '328165/71/1',
-        ssn: '941778636',
-        gender: 'Male',
-        designation: 'GENERAL WORKER',
-        dateOfJoining: '1998-12-10',
-        basicPay: 1500.00,
-        transportAllowance: 150.00,
-        mealAllowance: 0,
-        address: 'C75 Maramba - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '941778636',
-        nhima: '233296321110141'
-    },
-    {
-        id: 'ABR005',
-        name: 'KANG\'OTI BYEMBA ABRAHAM',
-        nrc: '198290/84/1',
-        ssn: '',
-        gender: 'Male',
-        designation: 'GENERAL WORKER',
-        dateOfJoining: '1969-08-18',
-        basicPay: 700.00,
-        transportAllowance: 100.00,
-        mealAllowance: 0,
-        address: '2670 Senanga Rd - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '',
-        nhima: ''
-    },
-    {
-        id: 'KAB006',
-        name: 'MUTALE KABAMBA',
-        nrc: '317029/68/1',
-        ssn: '320434124',
-        gender: 'Male',
-        designation: 'MANAGER',
-        dateOfJoining: '1998-04-03',
-        basicPay: 4000.00,
-        transportAllowance: 300.00,
-        mealAllowance: 200.00,
-        address: '10A Off Natwange Road - Livingstone',
-        department: 'IT & ACCOUNTS',
-        napsa: '320434124',
-        nhima: '322002911110110'
-    },
-    {
-        id: 'DAN007',
-        name: 'MWAANGA MWALE M. DANIEL',
-        nrc: '510487/71/1',
-        ssn: '912775251',
-        gender: 'Male',
-        designation: 'DRIVER',
-        dateOfJoining: '',
-        basicPay: 1500.00,
-        transportAllowance: 200.00,
-        mealAllowance: 0,
-        address: '',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '912775251',
-        nhima: '219861681110117'
-    }
-]);
-
-// Payslips - tracks created payslips
+// Database and state management
+const [employeeDatabase, setEmployeeDatabase] = useState([]);
 const [payslips, setPayslips] = useState([]);
+const [isLoading, setIsLoading] = useState(true);
+const [dbError, setDbError] = useState(null);
 
 const [currentView, setCurrentView] = useState('dashboard');
 const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -142,56 +30,176 @@ const payPeriodOptions = [
     employeeId: '',
     otherEarnings: [],
     otherDeductions: []
-  });const calculateDeductions = (basicPay, otherDeductions = []) => {
+  });
+
+  // Initialize database on component mount
+  useEffect(() => {
+    const initializeDatabase = async () => {
+      try {
+        setIsLoading(true);
+        setDbError(null);
+        
+        await databaseService.initialize();
+        
+        // Load employees and payslips from database
+        const employees = await databaseService.getAllEmployees();
+        const payslipData = await databaseService.getAllPayslips();
+        
+        setEmployeeDatabase(employees);
+        setPayslips(payslipData);
+        
+        console.log('Database initialized successfully');
+        console.log('Loaded employees:', employees.length);
+        console.log('Loaded payslips:', payslipData.length);
+      } catch (error) {
+        console.error('Failed to initialize database:', error);
+        setDbError('Failed to load database. Please refresh the page.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeDatabase();
+  }, []);
+
+  // Function to refresh data from database
+  const refreshData = async () => {
+    try {
+      const employees = await databaseService.getAllEmployees();
+      const payslipData = await databaseService.getAllPayslips();
+      
+      setEmployeeDatabase(employees);
+      setPayslips(payslipData);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      setDbError('Failed to refresh data from database.');
+    }
+  };const calculateDeductions = (basicPay, otherDeductions = []) => {
     const napsa = basicPay * 0.05; // 5% NAPSA
     const nhima = basicPay * 0.01; // 1% NHIMA
     const otherDeductionsTotal = otherDeductions.reduce((sum, deduction) => sum + deduction.amount, 0);
     return { napsa, nhima, loan: 0, otherDeductions: otherDeductionsTotal };
 };
 
-const calculatePayslip = (employee) => {
+const calculatePayslip = (payslipOrEmployee) => {
+    // Handle both payslip objects from database and employee objects
+    const isPayslip = payslipOrEmployee.hasOwnProperty('payrollPeriod') || payslipOrEmployee.hasOwnProperty('id') && typeof payslipOrEmployee.id === 'number';
+    
+    let employee, otherEarnings, otherDeductions;
+    
+    if (isPayslip) {
+      // It's a payslip from database
+      employee = {
+        id: payslipOrEmployee.employeeId || payslipOrEmployee.id,
+        name: payslipOrEmployee.name,
+        nrc: payslipOrEmployee.nrc,
+        ssn: payslipOrEmployee.ssn,
+        gender: payslipOrEmployee.gender,
+        designation: payslipOrEmployee.designation,
+        dateOfJoining: payslipOrEmployee.dateOfJoining,
+        basicPay: payslipOrEmployee.basicPay,
+        transportAllowance: payslipOrEmployee.transportAllowance,
+        mealAllowance: payslipOrEmployee.mealAllowance,
+        address: payslipOrEmployee.address,
+        department: payslipOrEmployee.department,
+        napsa: payslipOrEmployee.employeeNapsa || payslipOrEmployee.napsa,
+        nhima: payslipOrEmployee.employeeNhima || payslipOrEmployee.nhima
+      };
+      otherEarnings = payslipOrEmployee.otherEarnings || [];
+      otherDeductions = payslipOrEmployee.otherDeductions || [];
+    } else {
+      // It's an employee object
+      employee = payslipOrEmployee;
+      otherEarnings = payslipOrEmployee.otherEarnings || [];
+      otherDeductions = payslipOrEmployee.otherDeductions || [];
+    }
+
     // Auto-calculate house rent allowance as 30% of basic pay
     const calculatedHouseRent = employee.basicPay * 0.30;
-    const otherEarningsTotal = (employee.otherEarnings || []).reduce((sum, earning) => sum + earning.amount, 0);
+    const otherEarningsTotal = otherEarnings.reduce((sum, earning) => sum + (earning.amount || 0), 0);
     
     const totalEarnings = employee.basicPay + employee.transportAllowance + 
-calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
+      calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     
-    const deductions = calculateDeductions(employee.basicPay, employee.otherDeductions || []);
+    const deductions = calculateDeductions(employee.basicPay, otherDeductions);
     const totalDeductions = deductions.napsa + deductions.nhima + deductions.loan + deductions.otherDeductions;
     const netPay = totalEarnings - totalDeductions;
 
     return {
       ...employee,
-      houseRentAllowance: calculatedHouseRent, // Override with calculated value
+      houseRentAllowance: calculatedHouseRent,
+      otherEarnings,
+      otherDeductions,
       otherEarningsTotal,
       totalEarnings,
       deductions,
       totalDeductions,
-      netPay
+      netPay,
+      // Include payslip-specific data if available
+      ...(isPayslip && {
+        payrollPeriod: payslipOrEmployee.payrollPeriod,
+        workedDays: payslipOrEmployee.workedDays,
+        totalDays: payslipOrEmployee.totalDays,
+        createdAt: payslipOrEmployee.createdAt
+      })
     };
   };
 
-  const addPayslip = () => {
+  const addPayslip = async () => {
     if (newPayslip.employeeId) {
-      const employee = employeeDatabase.find(emp => emp.id === newPayslip.employeeId);
-      if (employee) {
-        const payslipData = {
-          ...employee,
-          payrollPeriod: payrollData.payPeriod,
-          workedDays: payrollData.workedDays,
-          totalDays: payrollData.totalDays,
-          otherEarnings: newPayslip.otherEarnings,
-          otherDeductions: newPayslip.otherDeductions,
-          createdAt: new Date().toISOString()
-        };
-        setPayslips([...payslips, payslipData]);
-        setNewPayslip({
-          employeeId: '',
-          otherEarnings: [],
-          otherDeductions: []
-        });
-        setCurrentView('dashboard');
+      try {
+        const employee = employeeDatabase.find(emp => emp.id === newPayslip.employeeId);
+        if (employee) {
+          // Calculate payslip data
+          const calculatedHouseRent = employee.basicPay * 0.30;
+          const otherEarningsTotal = (newPayslip.otherEarnings || []).reduce((sum, earning) => sum + earning.amount, 0);
+          
+          const totalEarnings = employee.basicPay + employee.transportAllowance + 
+            calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
+          
+          const deductions = calculateDeductions(employee.basicPay, newPayslip.otherDeductions || []);
+          const totalDeductions = deductions.napsa + deductions.nhima + deductions.loan + deductions.otherDeductions;
+          const netPay = totalEarnings - totalDeductions;
+
+          // Prepare payslip data for database
+          const payslipData = {
+            employeeId: employee.id,
+            payrollPeriod: payrollData.payPeriod,
+            workedDays: payrollData.workedDays,
+            totalDays: payrollData.totalDays,
+            basicPay: employee.basicPay,
+            transportAllowance: employee.transportAllowance,
+            houseRentAllowance: calculatedHouseRent,
+            mealAllowance: employee.mealAllowance,
+            otherEarnings: newPayslip.otherEarnings,
+            totalEarnings: totalEarnings,
+            napsa: deductions.napsa,
+            nhima: deductions.nhima,
+            loan: deductions.loan,
+            otherDeductions: newPayslip.otherDeductions,
+            totalDeductions: totalDeductions,
+            netPay: netPay
+          };
+
+          // Save to database
+          await databaseService.createPayslip(payslipData);
+          
+          // Refresh data from database
+          await refreshData();
+          
+          // Reset form
+          setNewPayslip({
+            employeeId: '',
+            otherEarnings: [],
+            otherDeductions: []
+          });
+          
+          setCurrentView('dashboard');
+          console.log('Payslip created and saved to database successfully');
+        }
+      } catch (error) {
+        console.error('Error creating payslip:', error);
+        setDbError('Failed to create payslip. Please try again.');
       }
     }
   };
@@ -234,8 +242,15 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     setNewPayslip({ ...newPayslip, otherDeductions: updatedDeductions });
   };
 
-  const deletePayslip = (index) => {
-    setPayslips(payslips.filter((_, i) => i !== index));
+  const deletePayslip = async (payslipId) => {
+    try {
+      await databaseService.deletePayslip(payslipId);
+      await refreshData();
+      console.log('Payslip deleted successfully');
+    } catch (error) {
+      console.error('Error deleting payslip:', error);
+      setDbError('Failed to delete payslip. Please try again.');
+    }
   };
 
   const generatePayslip = (payslipData) => {
@@ -791,7 +806,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                           </svg>
                         </button>
                         <button
-                          onClick={() => deletePayslip(index)}
+                          onClick={() => deletePayslip(payslip.id)}
                           className="inline-flex items-center px-2 py-1 border border-red-300 shadow-sm text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-red-500 transition-colors"
                           title="Delete Payslip"
                         >
@@ -2364,6 +2379,40 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       </div>
     );
   };
+
+  // Loading screen
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Payroll System</h2>
+          <p className="text-gray-600">Initializing SQLite database...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error screen
+  if (dbError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="bg-red-100 rounded-full h-12 w-12 flex items-center justify-center mx-auto mb-4">
+            <X className="h-6 w-6 text-red-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Database Error</h2>
+          <p className="text-gray-600 mb-4">{dbError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
