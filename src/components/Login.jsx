@@ -76,7 +76,7 @@ const Login = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-3 sm:p-4">
       {/* Background Pattern */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 opacity-20" style={{
@@ -88,20 +88,23 @@ const Login = ({ onLogin }) => {
         {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6 text-center">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 sm:px-8 py-6 text-center">
             <div className="flex items-center justify-center mb-4">
               <div className="bg-white bg-opacity-20 p-3 rounded-full">
                 <Building className="h-8 w-8 text-white" />
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Payroll System</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">
+              <span className="block sm:hidden">Payroll System</span>
+              <span className="hidden sm:block">Payroll System</span>
+            </h1>
             <p className="text-blue-100 text-sm">SPF & CM Enterprises Limited</p>
           </div>
 
           {/* Login Form */}
-          <div className="px-8 py-6">
+          <div className="px-6 sm:px-8 py-6">
             <div className="text-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">Welcome Back</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">Welcome Back</h2>
               <p className="text-gray-600 text-sm">Please sign in to access the payroll system</p>
             </div>
 
@@ -130,7 +133,7 @@ const Login = ({ onLogin }) => {
                     name="username"
                     value={formData.username}
                     onChange={handleInputChange}
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base"
                     placeholder="Enter your username"
                     required
                   />
@@ -152,13 +155,13 @@ const Login = ({ onLogin }) => {
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-base"
                     placeholder="Enter your password"
                     required
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center min-w-touch"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
@@ -197,7 +200,7 @@ const Login = ({ onLogin }) => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-lg text-white font-medium transition-all duration-200 ${
+                className={`w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-lg text-white font-medium transition-all duration-200 min-h-touch ${
                   isLoading
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transform hover:scale-105'
@@ -239,7 +242,7 @@ const Login = ({ onLogin }) => {
           </div>
 
           {/* Footer */}
-          <div className="bg-gray-50 px-8 py-4 text-center">
+          <div className="bg-gray-50 px-6 sm:px-8 py-4 text-center">
             <p className="text-xs text-gray-500">
               © 2025 SPF & CM Enterprises Limited. All rights reserved.
             </p>
