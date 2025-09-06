@@ -19,6 +19,7 @@ const [selectedEmployee, setSelectedEmployee] = useState(null);
 const [selectedEmployeeForPayslip, setSelectedEmployeeForPayslip] = useState('');
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+const [editingEmployee, setEditingEmployee] = useState(null);
 
 // Search functionality
 const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
@@ -230,6 +231,93 @@ const handleDeleteEmployee = async (employeeId) => {
             danger: true
         }
     );
+};
+
+const handleEditEmployee = (employee) => {
+    // Set the employee data for editing
+    setEditingEmployee(employee);
+    setNewEmployee({
+        id: employee.id,
+        name: employee.name,
+        nrc: employee.nrc || '',
+        ssn: employee.ssn || '',
+        gender: employee.gender || 'Male',
+        designation: employee.designation,
+        dateOfJoining: employee.dateOfJoining || '',
+        basicPay: employee.basicPay.toString(),
+        transportAllowance: employee.transportAllowance?.toString() || '0',
+        mealAllowance: employee.mealAllowance?.toString() || '0',
+        address: employee.address || '',
+        department: employee.department || '',
+        napsa: employee.napsa || '',
+        nhima: employee.nhima || ''
+    });
+    setShowEmployeeForm(true);
+};
+
+const handleUpdateEmployee = async () => {
+    if (!editingEmployee) {
+        showError('No employee selected for editing', 'Edit Error');
+        return;
+    }
+
+    if (!newEmployee.name.trim()) {
+        showError('Employee name is required', 'Validation Error');
+        return;
+    }
+
+    if (!newEmployee.designation.trim()) {
+        showError('Employee designation is required', 'Validation Error');
+        return;
+    }
+
+    try {
+        // Prepare updated employee data
+        const updatedEmployeeData = {
+            ...editingEmployee,
+            ...newEmployee,
+            basicPay: parseFloat(newEmployee.basicPay) || 0,
+            transportAllowance: parseFloat(newEmployee.transportAllowance) || 0,
+            mealAllowance: parseFloat(newEmployee.mealAllowance) || 0,
+            updatedAt: new Date().toISOString()
+        };
+
+        showLoading('Updating employee...');
+
+        // Update employee in database
+        await syncDatabaseService.updateEmployee(editingEmployee.id, updatedEmployeeData);
+        
+        // Update local state
+        const updatedEmployees = await syncDatabaseService.getEmployees();
+        setEmployeeDatabase(updatedEmployees);
+        
+        // Reset form
+        setNewEmployee({
+            id: '',
+            name: '',
+            nrc: '',
+            ssn: '',
+            gender: 'Male',
+            designation: '',
+            dateOfJoining: '',
+            basicPay: '',
+            transportAllowance: '',
+            mealAllowance: '',
+            address: '',
+            department: '',
+            napsa: '',
+            nhima: ''
+        });
+        
+        setEditingEmployee(null);
+        setShowEmployeeForm(false);
+        hideLoading();
+        showSuccess(`Employee ${updatedEmployeeData.name} has been updated successfully!`, 'Employee Updated');
+    } catch (error) {
+        hideLoading();
+        console.error('Error updating employee:', error);
+        showError(error.message || 'Failed to update employee', 'Update Employee Failed');
+    }
 };
 
 const handleBulkImportEmployees = async (event) => {
@@ -2639,10 +2727,12 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             </div>
           </div>
 
-          {/* Add Employee Form */}
+          {/* Add/Edit Employee Form */}
           {showEmployeeForm && (
             <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
-              <h4 className="font-semibold text-gray-800 mb-4">Add New Employee</h4>
+              <h4 className="font-semibold text-gray-800 mb-4">
+                {editingEmployee ? 'Edit Employee' : 'Add New Employee'}
+              </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID *</label>
@@ -2652,6 +2742,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     onChange={(e) => setNewEmployee({...newEmployee, id: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="e.g., EMP001"
+                    disabled={editingEmployee} // Disable ID editing when editing existing employee
                   />
                 </div>
                 <div>
@@ -2770,16 +2861,36 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </div>
               <div className="mt-4 flex justify-end gap-3">
                 <button
-                  onClick={() => setShowEmployeeForm(false)}
+                  onClick={() => {
+                    setShowEmployeeForm(false);
+                    setEditingEmployee(null);
+                    // Reset form when canceling
+                    setNewEmployee({
+                      id: '',
+                      name: '',
+                      nrc: '',
+                      ssn: '',
+                      gender: 'Male',
+                      designation: '',
+                      dateOfJoining: '',
+                      basicPay: '',
+                      transportAllowance: '',
+                      mealAllowance: '',
+                      address: '',
+                      department: '',
+                      napsa: '',
+                      nhima: ''
+                    });
+                  }}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleAddEmployee}
+                  onClick={editingEmployee ? handleUpdateEmployee : handleAddEmployee}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
-                  Add Employee
+                  {editingEmployee ? 'Update Employee' : 'Add Employee'}
                 </button>
               </div>
             </div>
@@ -2822,13 +2933,22 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{employee.designation}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">ZMW {employee.basicPay.toFixed(2)}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-sm">
-                      <button
-                        onClick={() => handleDeleteEmployee(employee.id)}
-                        className="text-red-600 hover:text-red-900 transition-colors"
-                        title="Delete Employee"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEditEmployee(employee)}
+                          className="text-blue-600 hover:text-blue-900 transition-colors"
+                          title="Edit Employee"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEmployee(employee.id)}
+                          className="text-red-600 hover:text-red-900 transition-colors"
+                          title="Delete Employee"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
