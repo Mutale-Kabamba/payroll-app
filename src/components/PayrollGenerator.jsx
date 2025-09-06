@@ -592,23 +592,27 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
   };
 
   const renderDashboard = () => (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Pay Period Selector */}
-      <div className="bg-white rounded border border-gray-300 shadow-sm p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <label className="text-sm font-medium text-gray-700">Pay Period:</label>
-          <select
-            value={payrollData.payPeriod}
-            onChange={(e) => setPayrollData({ ...payrollData, payPeriod: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {payPeriodOptions.map(period => (
-              <option key={period} value={period}>{period}</option>
-            ))}
-          </select>
-          <div className="flex items-center gap-4">
+      <div className="bg-white rounded-lg border border-gray-300 shadow-sm p-3 sm:p-4">
+        <div className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
+          <div className="flex-shrink-0">
+            <label className="text-sm font-medium text-gray-700">Pay Period:</label>
+          </div>
+          <div className="flex-1">
+            <select
+              value={payrollData.payPeriod}
+              onChange={(e) => setPayrollData({ ...payrollData, payPeriod: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              {payPeriodOptions.map(period => (
+                <option key={period} value={period}>{period}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col xs:flex-row gap-3 xs:gap-4">
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">Worked Days:</label>
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Worked Days:</label>
               <input
                 type="number"
                 min="1"
@@ -619,7 +623,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               />
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">Total Days:</label>
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Total Days:</label>
               <input
                 type="number"
                 min="1"
@@ -634,40 +638,40 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       </div>
 
       {/* Statistics Cards */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         <div className="stat-card-users">
           <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded">
-              <Users className="h-5 w-5 text-blue-600" />
+            <div className="p-3 bg-blue-100 rounded-lg flex-shrink-0">
+              <Users className="h-6 w-6 text-blue-600" />
             </div>
-            <div className="ml-4">
+            <div className="ml-4 flex-1 min-w-0">
               <p className="text-sm text-gray-600">Total Employees</p>
-              <p className="text-2xl font-bold text-gray-900">{employeeDatabase.length}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900">{employeeDatabase.length}</p>
             </div>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="stat-card-payroll">
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded">
-                <Calculator className="h-5 w-5 text-green-600" />
+              <div className="p-3 bg-green-100 rounded-lg flex-shrink-0">
+                <Calculator className="h-6 w-6 text-green-600" />
               </div>
-              <div className="ml-4">
+              <div className="ml-4 flex-1 min-w-0">
                 <p className="text-sm text-gray-600">Total Payslips Created</p>
-                <p className="text-xl font-bold text-gray-900">{payslips.length}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{payslips.length}</p>
               </div>
             </div>
           </div>
           
           <div className="stat-card-payroll">
             <div className="flex items-center">
-              <div className="p-2 bg-orange-100 rounded">
-                <Calculator className="h-5 w-5 text-orange-600" />
+              <div className="p-3 bg-orange-100 rounded-lg flex-shrink-0">
+                <DollarSign className="h-6 w-6 text-orange-600" />
               </div>
-              <div className="ml-4">
+              <div className="ml-4 flex-1 min-w-0">
                 <p className="text-sm text-gray-600">Total Wage Bill</p>
-                <p className="text-xl font-bold text-gray-900">
+                <p className="text-lg sm:text-xl font-bold text-gray-900 truncate">
                   ZMW {payslips.reduce((sum, payslip) => {
                     const calculatedPayslip = calculatePayslip(payslip);
                     return sum + calculatedPayslip.netPay;
@@ -680,12 +684,12 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         
         <div className="stat-card-period">
           <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded">
-              <FileText className="h-5 w-5 text-purple-600" />
+            <div className="p-3 bg-purple-100 rounded-lg flex-shrink-0">
+              <Calendar className="h-6 w-6 text-purple-600" />
             </div>
-            <div className="ml-4">
+            <div className="ml-4 flex-1 min-w-0">
               <p className="text-sm text-gray-600">Pay Period</p>
-              <p className="text-xl font-bold text-gray-900">{payrollData.payPeriod}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{payrollData.payPeriod}</p>
             </div>
           </div>
         </div>
@@ -693,25 +697,23 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
       {/* Payslips Section */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <div className="px-3 sm:px-4 py-3 border-b border-gray-200">
+          <div className="space-y-3 sm:space-y-0 sm:flex sm:justify-between sm:items-start">
             <div>
               <h2 className="text-lg font-bold text-gray-900">Generated Payslips</h2>
               <p className="text-xs text-gray-600 mt-1">
                 {payrollData.payPeriod} • {payslips.length} payslip{payslips.length !== 1 ? 's' : ''}
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative">
+            <div className="flex flex-col xs:flex-row gap-2">
+              <div className="relative flex-1 xs:flex-initial">
                 <input
                   type="text"
                   placeholder="Search..."
-                  className="pl-8 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent w-40"
+                  className="w-full xs:w-40 pl-8 pr-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                 />
                 <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                  <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+                  <Search className="h-4 w-4 text-gray-400" />
                 </div>
               </div>
               <button
@@ -959,28 +961,126 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                   exportAllPayslips();
                 }}
                 disabled={payslips.length === 0}
-                className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-colors ${
+                className={`px-3 py-2 rounded text-sm flex items-center gap-1 transition-colors min-h-touch ${
                   payslips.length === 0 
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                     : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
               >
-                <Download className="h-3 w-3" />
-                Export All PDF
+                <Download className="h-4 w-4" />
+                <span className="hidden xs:inline">Export All PDF</span>
+                <span className="xs:hidden">Export</span>
               </button>
               <button
                 onClick={() => setCurrentView('addPayslip')}
-                className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-blue-700 transition-colors"
+                className="bg-blue-600 text-white px-3 py-2 rounded text-sm flex items-center gap-1 hover:bg-blue-700 transition-colors min-h-touch"
               >
-                <Plus className="h-3 w-3" />
-                Add Payslip
+                <Plus className="h-4 w-4" />
+                <span className="hidden xs:inline">Add Payslip</span>
+                <span className="xs:hidden">Add</span>
               </button>
             </div>
           </div>
         </div>
         
-        {/* Compact Table View */}
-        <div className="overflow-x-auto">
+        {/* Mobile Cards View (hidden on md and up) */}
+        <div className="md:hidden">
+          {payslips.map((payslip) => {
+            const calculatedPayslip = calculatePayslip(payslip);
+            return (
+              <div key={payslip.id} className="bg-white border-b border-gray-200 p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center flex-1 min-w-0">
+                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-medium text-blue-700">
+                        {payslip.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                      </span>
+                    </div>
+                    <div className="ml-3 flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">{payslip.name}</div>
+                      <div className="text-xs text-gray-500">{payslip.id}</div>
+                    </div>
+                  </div>
+                  <span className="inline-flex px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800 flex-shrink-0">
+                    {payslip.designation}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4 mb-3 text-sm">
+                  <div>
+                    <div className="text-xs text-gray-500">Basic Pay</div>
+                    <div className="font-medium">{payslip.basicPay.toFixed(0)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Earnings</div>
+                    <div className="font-medium">{calculatedPayslip.totalEarnings.toFixed(0)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Net Pay</div>
+                    <div className="font-semibold text-green-600">{calculatedPayslip.netPay.toFixed(0)}</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">
+                    Ready
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => generatePayslip(payslip)}
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors min-h-touch"
+                      title="View Payslip"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </button>
+                    <button
+                      onClick={() => {
+                        generatePayslip(payslip);
+                        setTimeout(() => window.print(), 100);
+                      }}
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-green-500 transition-colors min-h-touch"
+                      title="Print Payslip"
+                    >
+                      <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      Print
+                    </button>
+                    <button
+                      onClick={() => deletePayslip(payslip.id)}
+                      className="inline-flex items-center px-3 py-2 border border-red-300 shadow-sm text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-red-500 transition-colors min-h-touch"
+                      title="Delete Payslip"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {payslips.length === 0 && (
+            <div className="p-8 text-center">
+              <div className="flex flex-col items-center">
+                <svg className="h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2h-2m-2 4H9a2 2 0 01-2-2v-4a2 2 0 012-2h4a2 2 0 012 2v4a2 2 0 01-2 2z" />
+                </svg>
+                <h3 className="text-base font-medium text-gray-900 mb-2">No payslips created</h3>
+                <p className="text-sm text-gray-500 mb-4">Get started by creating your first payslip</p>
+                <button
+                  onClick={() => setCurrentView('addPayslip')}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 min-h-touch"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Payslip
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Table View (hidden on mobile) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50">
               <tr>
@@ -1122,34 +1222,32 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           </table>
         </div>
 
-        {/* Compact Table Footer with Summary */}
+        {/* Table Footer with Summary */}
         {payslips.length > 0 && (
-          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-xs">
+          <div className="px-3 sm:px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center text-xs">
               <div className="text-gray-600">
                 {payslips.length} payslip{payslips.length !== 1 ? 's' : ''} • {payrollData.payPeriod}
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-gray-600">
-                <div className="flex items-center gap-4">
-                  <span>Total: <span className="font-semibold text-gray-900">
-                    {payslips.reduce((sum, payslip) => {
-                      const calculatedPayslip = calculatePayslip(payslip);
-                      return sum + calculatedPayslip.totalEarnings;
-                    }, 0).toFixed(0)}
-                  </span></span>
-                  <span>Deductions: <span className="font-semibold text-red-600">
-                    {payslips.reduce((sum, payslip) => {
-                      const calculatedPayslip = calculatePayslip(payslip);
-                      return sum + calculatedPayslip.totalDeductions;
-                    }, 0).toFixed(0)}
-                  </span></span>
-                  <span>Net: <span className="font-semibold text-green-600">
-                    {payslips.reduce((sum, payslip) => {
-                      const calculatedPayslip = calculatePayslip(payslip);
-                      return sum + calculatedPayslip.netPay;
-                    }, 0).toFixed(0)}
-                  </span></span>
-                </div>
+              <div className="flex flex-col xs:flex-row xs:items-center gap-2 xs:gap-4 text-gray-600">
+                <span>Total: <span className="font-semibold text-gray-900">
+                  {payslips.reduce((sum, payslip) => {
+                    const calculatedPayslip = calculatePayslip(payslip);
+                    return sum + calculatedPayslip.totalEarnings;
+                  }, 0).toFixed(0)}
+                </span></span>
+                <span>Deductions: <span className="font-semibold text-red-600">
+                  {payslips.reduce((sum, payslip) => {
+                    const calculatedPayslip = calculatePayslip(payslip);
+                    return sum + calculatedPayslip.totalDeductions;
+                  }, 0).toFixed(0)}
+                </span></span>
+                <span>Net: <span className="font-semibold text-green-600">
+                  {payslips.reduce((sum, payslip) => {
+                    const calculatedPayslip = calculatePayslip(payslip);
+                    return sum + calculatedPayslip.netPay;
+                  }, 0).toFixed(0)}
+                </span></span>
               </div>
             </div>
           </div>
@@ -2787,55 +2885,66 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <h1 className="text-2xl font-bold text-gray-900">Payroll Management System</h1>
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+          <div className="flex justify-between items-center py-3 sm:py-4 lg:py-6">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">
+                <span className="block sm:hidden">Payroll System</span>
+                <span className="hidden sm:block lg:hidden">Payroll Management</span>
+                <span className="hidden lg:block">Payroll Management System</span>
+              </h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">SPF & CM Enterprises Limited</p>
+            </div>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               {/* Mobile menu button */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors min-h-touch min-w-touch flex items-center justify-center"
+                aria-label="Toggle mobile menu"
               >
                 {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
 
               {/* Navigation */}
-              <nav className="hidden md:flex space-x-4">
+              <nav className="hidden md:flex space-x-2 lg:space-x-4">
                 <button
                   onClick={() => setCurrentView('dashboard')}
-                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                  className={`px-2 lg:px-4 py-2 rounded font-medium transition-colors text-sm lg:text-base ${
                     currentView === 'dashboard' 
                       ? 'bg-blue-600 text-white' 
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
-                  Dashboard
+                  <span className="lg:hidden">Dashboard</span>
+                  <span className="hidden lg:inline">Dashboard</span>
                 </button>
                 <button
                   onClick={() => setCurrentView('reports')}
-                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                  className={`px-2 lg:px-4 py-2 rounded font-medium transition-colors text-sm lg:text-base ${
                     currentView === 'reports' 
                       ? 'bg-blue-600 text-white' 
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
-                  Wage Bill Reports
+                  <span className="lg:hidden">Reports</span>
+                  <span className="hidden lg:inline">Wage Bill Reports</span>
                 </button>
                 <button
                   onClick={() => setCurrentView('dataManagement')}
-                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                  className={`px-2 lg:px-4 py-2 rounded font-medium transition-colors text-sm lg:text-base ${
                     currentView === 'dataManagement' 
                       ? 'bg-blue-600 text-white' 
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
-                  Data Management
+                  <span className="lg:hidden">Data</span>
+                  <span className="hidden lg:inline">Data Management</span>
                 </button>
               </nav>
 
               {/* Sync Status Indicator */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center">
                 <div className={`flex items-center space-x-1 px-2 py-1 rounded text-xs ${
                   !isOnline 
                     ? 'bg-red-100 text-red-700' 
@@ -2871,13 +2980,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
               {/* User Menu */}
               <div className="relative group">
-                <div className="flex items-center space-x-3 cursor-pointer p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center">
+                <div className="flex items-center space-x-2 cursor-pointer p-1 sm:p-2 rounded-lg hover:bg-gray-100 transition-colors min-h-touch">
+                  <div className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0">
                     <User className="h-4 w-4" />
                   </div>
                   <div className="hidden sm:block text-right">
-                    <p className="text-sm font-medium text-gray-900">{user?.username || 'User'}</p>
-                    <p className="text-xs text-gray-500">{user?.role || 'Role'}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate max-w-24 lg:max-w-none">{user?.username || 'User'}</p>
+                    <p className="text-xs text-gray-500 truncate max-w-24 lg:max-w-none">{user?.role || 'Role'}</p>
                   </div>
                 </div>
                 
@@ -2917,18 +3026,19 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           {/* Mobile Navigation Menu */}
           {isMobileMenuOpen && (
             <div className="md:hidden border-t border-gray-200 bg-white">
-              <div className="px-4 py-2 space-y-1">
+              <div className="px-3 py-3 space-y-1">
                 <button
                   onClick={() => {
                     setCurrentView('dashboard');
                     setIsMobileMenuOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2 rounded font-medium transition-colors ${
+                  className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors min-h-touch flex items-center ${
                     currentView === 'dashboard' 
                       ? 'bg-blue-600 text-white' 
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
+                  <BarChart3 className="h-5 w-5 mr-3" />
                   Dashboard
                 </button>
                 <button
@@ -2936,12 +3046,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     setCurrentView('reports');
                     setIsMobileMenuOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2 rounded font-medium transition-colors ${
+                  className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors min-h-touch flex items-center ${
                     currentView === 'reports' 
                       ? 'bg-blue-600 text-white' 
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
+                  <FileText className="h-5 w-5 mr-3" />
                   Wage Bill Reports
                 </button>
                 <button
@@ -2949,14 +3060,44 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     setCurrentView('dataManagement');
                     setIsMobileMenuOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2 rounded font-medium transition-colors ${
+                  className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors min-h-touch flex items-center ${
                     currentView === 'dataManagement' 
                       ? 'bg-blue-600 text-white' 
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
+                  <Database className="h-5 w-5 mr-3" />
                   Data Management
                 </button>
+                
+                {/* Mobile User Info */}
+                <div className="pt-3 mt-3 border-t border-gray-200">
+                  <div className="px-4 py-2">
+                    <p className="text-sm font-medium text-gray-900">{user?.username}</p>
+                    <p className="text-xs text-gray-500">{user?.role}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      showConfirm(
+                        'Are you sure you want to log out?',
+                        () => {
+                          onLogout();
+                          closeModal('confirm');
+                        },
+                        {
+                          title: 'Confirm Logout',
+                          confirmText: 'Logout',
+                          cancelText: 'Cancel'
+                        }
+                      );
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center px-4 py-3 text-sm text-red-700 hover:bg-red-50 rounded-lg transition-colors min-h-touch"
+                  >
+                    <LogOut className="h-4 w-4 mr-3" />
+                    Logout
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -2964,7 +3105,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
         {currentView === 'dashboard' && renderDashboard()}
         {currentView === 'addPayslip' && renderAddPayslip()}
         {currentView === 'payslip' && renderPayslip()}
