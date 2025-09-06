@@ -214,11 +214,11 @@ class DatabaseService {
 
   addPayslip(payslip) {
     const payslips = this.getPayslips();
-    // Add timestamp and unique ID
+    // Add timestamp and preserve existing ID if provided
     const payslipWithMeta = {
       ...payslip,
-      id: this.generateId(),
-      createdAt: new Date().toISOString(),
+      id: payslip.id || this.generateId(),
+      createdAt: payslip.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
     payslips.push(payslipWithMeta);
