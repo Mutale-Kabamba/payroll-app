@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Download, Calculator, Users, FileText, Menu, X, BarChart3, TrendingUp, DollarSign, Calendar, LogOut, User } from 'lucide-react';
-import databaseService from '../services/DatabaseService';
+import { Plus, Edit2, Trash2, Download, Calculator, Users, FileText, Menu, X, BarChart3, TrendingUp, DollarSign, Calendar, LogOut, User, Wifi, WifiOff, Cloud, CloudOff } from 'lucide-react';
+import syncDatabaseService from '../services/SyncDatabaseService';
 import { SuccessModal, ErrorModal, ConfirmModal, InfoModal } from './Modal';
 import LoadingModal from './LoadingModal';
 import { useNotification } from '../hooks/useNotification';
@@ -8,6 +8,8 @@ import { useNotification } from '../hooks/useNotification';
 const PayrollGenerator = ({ user, onLogout }) => {
 // Employee Database - loaded from persistent storage
 const [employeeDatabase, setEmployeeDatabase] = useState([]);
+const [isOnline, setIsOnline] = useState(navigator.onLine);
+const [syncStatus, setSyncStatus] = useState('idle'); // idle, syncing, synced, error
 
 // Payslips - loaded from persistent storage
 const [payslips, setPayslips] = useState([]);
@@ -27,35 +29,69 @@ const { modals, showSuccess, showError, showConfirm, showInfo, showLoading, hide
 
 // Load data from database on component mount
 useEffect(() => {
-    try {
-        // Load employees from database
-        const employees = databaseService.getEmployees();
-        setEmployeeDatabase(employees);
+    const loadData = async () => {
+        setSyncStatus('syncing');
+        try {
+            // Load employees from sync service
+            const employees = await syncDatabaseService.getEmployees();
+            setEmployeeDatabase(employees);
 
-        // Load payslips from database
-        const savedPayslips = databaseService.getPayslips();
-        setPayslips(savedPayslips);
+            // Load payslips from sync service
+            const savedPayslips = await syncDatabaseService.getPayslips();
+            setPayslips(savedPayslips);
 
-        // Load payroll settings from database
-        const settings = databaseService.getPayrollSettings();
-        setPayrollData(prevData => ({
-            ...prevData,
-            payPeriod: settings.payPeriod || prevData.payPeriod,
-            workedDays: settings.workedDays || prevData.workedDays,
-            totalDays: settings.totalDays || prevData.totalDays
-        }));
-    } catch (error) {
-        console.error('Error loading data from database:', error);
-    }
+            // Load payroll settings from sync service
+            const settings = await syncDatabaseService.getPayrollSettings();
+            setPayrollData(prevData => ({
+                ...prevData,
+                payPeriod: settings.payPeriod || prevData.payPeriod,
+                workedDays: settings.workedDays || prevData.workedDays,
+                totalDays: settings.totalDays || prevData.totalDays
+            }));
+            
+            setSyncStatus('synced');
+        } catch (error) {
+            console.error('Error loading data from database:', error);
+            setSyncStatus('error');
+        }
+    };
+
+    loadData();
+
+    // Listen for online/offline events
+    const handleOnline = () => {
+        setIsOnline(true);
+        setSyncStatus('syncing');
+        // Reload data when coming back online
+        loadData();
+    };
+
+    const handleOffline = () => {
+        setIsOnline(false);
+        setSyncStatus('offline');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Cleanup listeners
+    return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+    };
 }, []);
 
 // Save payroll settings whenever they change
 useEffect(() => {
-    try {
-        databaseService.setPayrollSettings(payrollData);
-    } catch (error) {
-        console.error('Error saving payroll settings:', error);
-    }
+    const saveSettings = async () => {
+        try {
+            await syncDatabaseService.setPayrollSettings(payrollData);
+        } catch (error) {
+            console.error('Error saving payroll settings:', error);
+        }
+    };
+    
+    saveSettings();
 }, [payrollData]);
 
 const payPeriodOptions = [
@@ -99,7 +135,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     };
   };
 
-  const addPayslip = () => {
+  const addPayslip = async () => {
     if (newPayslip.employeeId) {
       try {
         const employee = employeeDatabase.find(emp => emp.id === newPayslip.employeeId);
@@ -119,10 +155,10 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         };
 
         // Save to database
-        databaseService.addPayslip(payslipData);
+        await syncDatabaseService.addPayslip(payslipData);
         
         // Update local state
-        const updatedPayslips = databaseService.getPayslips();
+        const updatedPayslips = await syncDatabaseService.getPayslips();
         setPayslips(updatedPayslips);
         
         // Reset form
@@ -185,13 +221,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     
     showConfirm(
       `Are you sure you want to delete the payslip for ${employeeName}? This action cannot be undone.`,
-      () => {
+      async () => {
         try {
           // Delete from database
-          databaseService.deletePayslip(payslipId);
+          await syncDatabaseService.deletePayslip(payslipId);
           
           // Update local state
-          const updatedPayslips = databaseService.getPayslips();
+          const updatedPayslips = await syncDatabaseService.getPayslips();
           setPayslips(updatedPayslips);
           
           showSuccess(`Payslip for ${employeeName} has been deleted successfully.`, 'Payslip Deleted');
@@ -2340,9 +2376,9 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
   };
 
   const renderDataManagement = () => {
-    const handleExportData = () => {
+    const handleExportData = async () => {
       try {
-        const data = databaseService.exportAllData();
+        const data = await syncDatabaseService.exportAllData();
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -2372,14 +2408,14 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           
           showConfirm(
             'This will replace all existing data with the data from the backup file. Your current employees, payslips, and settings will be permanently overwritten. Are you sure you want to continue?',
-            () => {
+            async () => {
               try {
-                databaseService.importAllData(data);
+                await syncDatabaseService.importAllData(data);
                 
                 // Refresh local state
-                setEmployeeDatabase(databaseService.getEmployees());
-                setPayslips(databaseService.getPayslips());
-                setPayrollData(databaseService.getPayrollSettings());
+                setEmployeeDatabase(await syncDatabaseService.getEmployees());
+                setPayslips(await syncDatabaseService.getPayslips());
+                setPayrollData(await syncDatabaseService.getPayrollSettings());
                 
                 showSuccess('Your backup data has been imported successfully! All data has been restored.', 'Data Imported');
                 closeModal('confirm');
@@ -2413,15 +2449,15 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         () => {
           showConfirm(
             'FINAL WARNING: You are about to delete everything. This is your last chance to cancel. Do you really want to delete all data?',
-            () => {
+            async () => {
               try {
-                databaseService.clearAllData();
+                await syncDatabaseService.clearAllData();
                 
                 // Reset to initial state
-                databaseService.initializeDatabase();
-                setEmployeeDatabase(databaseService.getEmployees());
-                setPayslips(databaseService.getPayslips());
-                setPayrollData(databaseService.getPayrollSettings());
+                syncDatabaseService.initializeDatabase();
+                setEmployeeDatabase(await syncDatabaseService.getEmployees());
+                setPayslips(await syncDatabaseService.getPayslips());
+                setPayrollData(await syncDatabaseService.getPayrollSettings());
                 
                 showSuccess('All data has been cleared successfully. The system has been reset to its default state.', 'Data Cleared');
                 closeModal('confirm');
@@ -2449,7 +2485,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       );
     };
 
-    const storageInfo = databaseService.getStorageInfo();
+    const storageInfo = syncDatabaseService.getStorageInfo();
 
     return (
       <div className="space-y-6">
@@ -2548,7 +2584,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                 placeholder="Search by name, ID, designation, or department..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 onChange={(e) => {
-                  const results = databaseService.searchEmployees(e.target.value);
+                  const results = syncDatabaseService.searchEmployees(e.target.value);
                   console.log('Employee search results:', results);
                 }}
               />
@@ -2560,7 +2596,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                 placeholder="Search by employee name, ID, or pay period..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 onChange={(e) => {
-                  const results = databaseService.searchPayslips(e.target.value);
+                  const results = syncDatabaseService.searchPayslips(e.target.value);
                   console.log('Payslip search results:', results);
                 }}
               />
@@ -2621,6 +2657,41 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                   Data Management
                 </button>
               </nav>
+
+              {/* Sync Status Indicator */}
+              <div className="flex items-center space-x-2">
+                <div className={`flex items-center space-x-1 px-2 py-1 rounded text-xs ${
+                  !isOnline 
+                    ? 'bg-red-100 text-red-700' 
+                    : syncStatus === 'synced' 
+                    ? 'bg-green-100 text-green-700'
+                    : syncStatus === 'syncing'
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {!isOnline ? (
+                    <>
+                      <WifiOff className="h-3 w-3" />
+                      <span className="hidden sm:inline">Offline</span>
+                    </>
+                  ) : syncStatus === 'synced' ? (
+                    <>
+                      <Cloud className="h-3 w-3" />
+                      <span className="hidden sm:inline">Synced</span>
+                    </>
+                  ) : syncStatus === 'syncing' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b border-current"></div>
+                      <span className="hidden sm:inline">Syncing</span>
+                    </>
+                  ) : (
+                    <>
+                      <CloudOff className="h-3 w-3" />
+                      <span className="hidden sm:inline">Local</span>
+                    </>
+                  )}
+                </div>
+              </div>
 
               {/* User Menu */}
               <div className="relative group">
