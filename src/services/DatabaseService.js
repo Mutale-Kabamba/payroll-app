@@ -5,11 +5,16 @@ class DatabaseService {
     this.initializeDatabase();
   }
 
-  // Initialize database with default data if it doesn't exist
+  // Initialize database with default data only on first use (not when all employees are deleted)
   initializeDatabase() {
     const employees = this.getEmployees();
-    if (employees.length === 0) {
+    // Only initialize defaults if no employees exist AND no 'initialized' flag is set
+    const hasBeenInitialized = localStorage.getItem(`${this.storagePrefix}initialized`);
+    
+    if (employees.length === 0 && !hasBeenInitialized) {
       this.initializeDefaultEmployees();
+      // Set flag to prevent re-initialization when all employees are deleted
+      localStorage.setItem(`${this.storagePrefix}initialized`, 'true');
     }
   }
 
