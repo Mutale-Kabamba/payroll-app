@@ -348,7 +348,7 @@ const handleBulkImportEmployees = async (event) => {
     
     // Reset the file input
     event.target.value = '';
-};
+  };
 
   const [newPayslip, setNewPayslip] = useState({
     employeeId: '',
@@ -385,44 +385,49 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
   };
 
   const addPayslip = async () => {
-    if (newPayslip.employeeId) {
-      try {
-        const employee = employeeDatabase.find(emp => emp.id === newPayslip.employeeId);
-        if (!employee) {
-          showError('Employee not found! Please select a valid employee.');
-          return;
-        }
+    if (!selectedEmployeeForPayslip) {
+      showError('Please select an employee');
+      return;
+    }
 
-        const payslipData = {
-          ...employee,
-          payrollPeriod: payrollData.payPeriod,
-          workedDays: payrollData.workedDays,
-          totalDays: payrollData.totalDays,
-          otherEarnings: newPayslip.otherEarnings,
-          otherDeductions: newPayslip.otherDeductions,
-          createdAt: new Date().toISOString()
-        };
-
-        // Save to database
-        await syncDatabaseService.addPayslip(payslipData);
-        
-        // Update local state
-        const updatedPayslips = await syncDatabaseService.getPayslips();
-        setPayslips(updatedPayslips);
-        
-        // Reset form
-        setNewPayslip({
-          employeeId: '',
-          otherEarnings: [],
-          otherDeductions: []
-        });
-        
-        setCurrentView('dashboard');
-        showSuccess(`Payslip for ${employee.name} has been created successfully!`, 'Payslip Created');
-      } catch (error) {
-        console.error('Error creating payslip:', error);
-        showError(`Failed to create payslip: ${error.message}`, 'Creation Failed');
+    try {
+      const employee = employeeDatabase.find(emp => emp.id === selectedEmployeeForPayslip);
+      if (!employee) {
+        showError('Selected employee not found');
+        return;
       }
+
+      showLoading('Generating payslip...');
+
+      // Generate payslip with proper ID
+      const payslipId = `PS_${employee.id}_${Date.now()}`;
+      const newPayslip = {
+        id: payslipId, // Ensure unique ID
+        employee: employee,
+        payPeriod: payrollData.payPeriod,
+        workedDays: payrollData.workedDays,
+        totalDays: payrollData.totalDays,
+        basicPay: parseFloat(employee.basicPay) || 0,
+        transportAllowance: parseFloat(employee.transportAllowance) || 0,
+        mealAllowance: parseFloat(employee.mealAllowance) || 0,
+        createdAt: new Date().toISOString(),
+        // ... other payslip data
+      };
+
+      // Save to database
+      await syncDatabaseService.addPayslip(newPayslip);
+      
+      // Update local state
+      const updatedPayslips = await syncDatabaseService.getPayslips();
+      setPayslips(updatedPayslips);
+
+      hideLoading();
+      showSuccess(`Payslip generated successfully for ${employee.name}!`);
+      setSelectedEmployeeForPayslip('');
+    } catch (error) {
+      console.error('Error generating payslip:', error);
+      hideLoading();
+      showError('Failed to generate payslip');
     }
   };
 
@@ -465,32 +470,28 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
   };
 
   const deletePayslip = (payslipId) => {
-    const payslip = payslips.find(p => p.id === payslipId);
-    const employeeName = payslip ? payslip.name : 'Unknown Employee';
-    
     showConfirm(
-      `Are you sure you want to delete the payslip for ${employeeName}? This action cannot be undone.`,
+      'Delete Payslip',
+      'Are you sure you want to delete this payslip? This action cannot be undone.',
       async () => {
         try {
-          // Delete from database
+          showLoading('Deleting payslip...');
+          
+          // Delete from database service
           await syncDatabaseService.deletePayslip(payslipId);
           
-          // Update local state
-          const updatedPayslips = await syncDatabaseService.getPayslips();
-          setPayslips(updatedPayslips);
+          // Immediately update local state to reflect the change
+          setPayslips(prevPayslips => prevPayslips.filter(p => p.id !== payslipId));
           
-          showSuccess(`Payslip for ${employeeName} has been deleted successfully.`, 'Payslip Deleted');
+          hideLoading();
+          closeModal('confirm');
+          showSuccess('Payslip deleted successfully!');
         } catch (error) {
           console.error('Error deleting payslip:', error);
-          showError(`Failed to delete payslip: ${error.message}`, 'Deletion Failed');
+          hideLoading();
+          closeModal('confirm');
+          showError('Failed to delete payslip. Please try again.');
         }
-        closeModal('confirm');
-      },
-      {
-        title: 'Delete Payslip',
-        confirmText: 'Delete',
-        cancelText: 'Cancel',
-        danger: true
       }
     );
   };
@@ -1050,7 +1051,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                           </svg>
                         </button>
                         <button
-                          onClick={() => deletePayslip(payslip.id)}
+                          onClick={() => deletePayslip(payslip.id)} // Ensure this uses payslip.id
                           className="inline-flex items-center px-2 py-1 border border-red-300 shadow-sm text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-red-500 transition-colors"
                           title="Delete Payslip"
                         >
@@ -1066,7 +1067,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                   <td colSpan="8" className="px-3 py-8 text-center">
                     <div className="flex flex-col items-center">
                       <svg className="h-10 w-10 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2h-2m-2 4H9a2 2 0 01-2-2v-4a2 2 0 012-2h4a2 2 0 012 2v4a2 2 0 01-2 2z" />
                       </svg>
                       <h3 className="text-sm font-medium text-gray-900 mb-1">No payslips created</h3>
                       <p className="text-xs text-gray-500 mb-3">Get started by creating your first payslip</p>
@@ -2231,349 +2232,6 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                 
                 printWindow.document.write(reportHTML);
                 printWindow.document.close();
-              }}
-              className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 transition-colors"
-            >
-              <FileText className="h-4 w-4" />
-              Print Preview
-            </button>
-            <button
-              onClick={() => {
-                // Check if there's data to print
-                if (payslips.length === 0) {
-                  showInfo('No payroll data is available to print. Please create some payslips first before printing reports.', 'No Data Available');
-                  return;
-                }
-                
-                // Prepare simplified report data
-                const calculatedPayslips = payslips.map(payslip => calculatePayslip(payslip));
-                const totalWageBill = calculatedPayslips.reduce((sum, p) => sum + p.netPay, 0);
-                const totalGrossWages = calculatedPayslips.reduce((sum, p) => sum + p.totalEarnings, 0);
-                
-                // Create a temporary window for printing
-                const printWindow = window.open('', '_blank', 'width=1000,height=700');
-                
-                const reportHTML = `
-                  <!DOCTYPE html>
-                  <html lang="en">
-                  <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Wage Bill Report - ${new Date().toLocaleDateString()}</title>
-                    <style>
-                      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-                      
-                      * {
-                        margin: 0;
-                        padding: 0;
-                        box-sizing: border-box;
-                      }
-                      
-                      body {
-                        font-family: 'Inter', sans-serif;
-                        line-height: 1.5;
-                        color: #111827;
-                        background: white;
-                        margin: 20px;
-                      }
-                      
-                      .header {
-                        text-align: center;
-                        margin-bottom: 30px;
-                        padding-bottom: 20px;
-                        border-bottom: 2px solid #1e40af;
-                      }
-                      
-                      .company-title {
-                        font-size: 28px;
-                        font-weight: 700;
-                        color: #1e40af;
-                        margin-bottom: 8px;
-                      }
-                      
-                      .report-title {
-                        font-size: 20px;
-                        font-weight: 600;
-                        color: #374151;
-                        margin-bottom: 5px;
-                      }
-                      
-                      .report-date {
-                        font-size: 14px;
-                        color: #6b7280;
-                      }
-                      
-                      .summary-section {
-                        display: flex;
-                        justify-content: center;
-                        gap: 50px;
-                        margin-bottom: 30px;
-                        padding: 20px;
-                        background-color: #f9fafb;
-                        border-radius: 8px;
-                        border: 1px solid #e5e7eb;
-                      }
-                      
-                      .summary-card {
-                        text-align: center;
-                        padding: 15px;
-                      }
-                      
-                      .summary-label {
-                        font-size: 14px;
-                        font-weight: 500;
-                        color: #6b7280;
-                        margin-bottom: 5px;
-                      }
-                      
-                      .summary-amount {
-                        font-size: 24px;
-                        font-weight: 700;
-                        color: #059669;
-                      }
-                      
-                      .table-section {
-                        margin-bottom: 30px;
-                      }
-                      
-                      .table-title {
-                        font-size: 18px;
-                        font-weight: 600;
-                        color: #374151;
-                        margin-bottom: 15px;
-                      }
-                      
-                      table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin-bottom: 20px;
-                        border: 2px solid #d1d5db;
-                      }
-                      
-                      th {
-                        background-color: #f3f4f6;
-                        padding: 12px 8px;
-                        text-align: left;
-                        font-weight: 600;
-                        font-size: 12px;
-                        color: #374151;
-                        border: 1px solid #d1d5db;
-                        text-transform: uppercase;
-                      }
-                      
-                      td {
-                        padding: 10px 8px;
-                        border: 1px solid #d1d5db;
-                        font-size: 12px;
-                        color: #374151;
-                      }
-                      
-                      tr:nth-child(even) {
-                        background-color: #f9fafb;
-                      }
-                      
-                      tr:hover {
-                        background-color: #f3f4f6;
-                      }
-                      
-                      .amount {
-                        text-align: right;
-                        font-weight: 500;
-                      }
-                      
-                      .net-pay {
-                        color: #059669;
-                        font-weight: 600;
-                      }
-                      
-                      .gross-pay {
-                        color: #2563eb;
-                        font-weight: 500;
-                      }
-                      
-                      .deductions {
-                        color: #dc2626;
-                        font-weight: 500;
-                      }
-                      
-                      .employee-name {
-                        font-weight: 500;
-                        text-transform: uppercase;
-                      }
-                      
-                      .approval-section {
-                        margin: 40px 0;
-                        padding: 30px;
-                        background-color: #f8fffe;
-                        border: 2px solid #059669;
-                        border-radius: 12px;
-                      }
-                      
-                      .total-amount-card {
-                        text-align: center;
-                        margin-bottom: 30px;
-                        padding: 25px;
-                        background: linear-gradient(135deg, #059669, #047857);
-                        color: white;
-                        border-radius: 10px;
-                        box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);
-                      }
-                      
-                      .total-label {
-                        font-size: 16px;
-                        font-weight: 600;
-                        margin-bottom: 10px;
-                        text-transform: uppercase;
-                        letter-spacing: 0.5px;
-                      }
-                      
-                      .total-value {
-                        font-size: 32px;
-                        font-weight: 800;
-                        margin-bottom: 8px;
-                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-                      }
-                      
-                      .approval-note {
-                        font-size: 13px;
-                        font-weight: 400;
-                        opacity: 0.9;
-                        font-style: italic;
-                      }
-                      
-                      .signature-section {
-                        display: flex;
-                        justify-content: space-between;
-                        gap: 40px;
-                        margin-top: 30px;
-                      }
-                      
-                      .signature-box {
-                        flex: 1;
-                        text-align: center;
-                      }
-                      
-                      .signature-line {
-                        width: 100%;
-                        height: 50px;
-                        border-bottom: 2px solid #374151;
-                        margin-bottom: 10px;
-                      }
-                      
-                      .signature-label {
-                        font-size: 14px;
-                        font-weight: 600;
-                        color: #374151;
-                        margin-bottom: 8px;
-                      }
-                      
-                      .signature-date {
-                        font-size: 12px;
-                        color: #6b7280;
-                        font-style: italic;
-                      }
-                      
-                      .footer {
-                        text-align: center;
-                        margin-top: 40px;
-                        padding-top: 20px;
-                        border-top: 1px solid #e5e7eb;
-                        font-size: 12px;
-                        color: #6b7280;
-                      }
-                      
-                      @media print {
-                        body {
-                          margin: 0;
-                        }
-                        
-                        @page {
-                          margin: 0.5in;
-                          size: A4;
-                        }
-                      }
-                    </style>
-                  </head>
-                  <body>
-                    <div class="header">
-                      <div class="company-title">SPF & CM ENTERPRISES LIMITED</div>
-                      <div class="report-title">Wage Bill Report</div>
-                      <div class="report-date">Generated on ${new Date().toLocaleDateString()}</div>
-                    </div>
-                    
-                    <div class="summary-section">
-                      <div class="summary-card">
-                        <div class="summary-label">Total Wage Bill</div>
-                        <div class="summary-amount">ZMW ${totalWageBill.toFixed(2)}</div>
-                      </div>
-                      <div class="summary-card">
-                        <div class="summary-label">Total Gross Wages</div>
-                        <div class="summary-amount">ZMW ${totalGrossWages.toFixed(2)}</div>
-                      </div>
-                    </div>
-                    
-                    <div class="table-section">
-                      <div class="table-title">Employee Payroll Details</div>
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Pay Period</th>
-                            <th>Employee Name</th>
-                            <th>Basic Pay</th>
-                            <th>Allowances</th>
-                            <th>Gross Pay</th>
-                            <th>Deductions</th>
-                            <th>Net Pay</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          ${calculatedPayslips.map(payslip => `
-                            <tr>
-                              <td>${payslip.payrollPeriod || 'N/A'}</td>
-                              <td class="employee-name">${payslip.name}</td>
-                              <td class="amount">ZMW ${payslip.basicPay.toFixed(2)}</td>
-                              <td class="amount">ZMW ${(payslip.transportAllowance + payslip.houseRentAllowance + payslip.mealAllowance + (payslip.otherEarningsTotal || 0)).toFixed(2)}</td>
-                              <td class="amount gross-pay">ZMW ${payslip.totalEarnings.toFixed(2)}</td>
-                              <td class="amount deductions">ZMW ${payslip.totalDeductions.toFixed(2)}</td>
-                              <td class="amount net-pay">ZMW ${payslip.netPay.toFixed(2)}</td>
-                            </tr>
-                          `).join('')}
-                        </tbody>
-                      </table>
-                    </div>
-                    
-                    <div class="approval-section">
-                      <div class="total-amount-card">
-                        <div class="total-label">Total Amount to be Paid to Employees</div>
-                        <div class="total-value">ZMW ${totalWageBill.toFixed(2)}</div>
-                        <div class="approval-note">This amount requires management approval for payroll processing</div>
-                      </div>
-                      
-                      <div class="signature-section">
-                        <div class="signature-box">
-                          <div class="signature-line"></div>
-                          <div class="signature-label">Prepared By: ________________________</div>
-                          <div class="signature-date">Date: ________________________</div>
-                        </div>
-                        
-                        <div class="signature-box">
-                          <div class="signature-line"></div>
-                          <div class="signature-label">Approved By: ________________________</div>
-                          <div class="signature-date">Date: ________________________</div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div class="footer">
-                      <p>This is a system generated report - SPF & CM Enterprises Limited</p>
-                      <p>Report generated on ${new Date().toLocaleString()}</p>
-                    </div>
-                  </body>
-                  </html>
-                `;
-                
-                printWindow.document.write(reportHTML);
-                printWindow.document.close();
                 
                 // Auto-trigger print dialog
                 printWindow.onload = function() {
@@ -2945,7 +2603,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {employeeDatabase.map((employee) => (
-                  <tr key={employee.id} className="hover:bg-gray-50">
+                  <tr key={employee.id} className="border-b border-gray-200 hover:bg-gray-50">
                     <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{employee.id}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{employee.name}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{employee.designation}</td>
