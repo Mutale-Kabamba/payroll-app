@@ -396,61 +396,406 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       </div>
 
       {/* Payslips Section */}
-      <div className="card-gradient">
-        <div className="px-6 py-4 border-b border-gray-300">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-gray-900">Generated Payslips</h2>
-            <button
-              onClick={() => setCurrentView('addPayslip')}
-              className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm"
-            >
-              <Plus className="h-4 w-4" />
-              Add Payslip
-            </button>
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Generated Payslips</h2>
+              <p className="text-xs text-gray-600 mt-1">
+                {payrollData.payPeriod} • {payslips.length} payslip{payslips.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="pl-8 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent w-40"
+                />
+                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                  <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (payslips.length === 0) {
+                    alert('No payslips to export');
+                    return;
+                  }
+                  // Generate and export all payslips as PDF
+                  const exportAllPayslips = () => {
+                    const printWindow = window.open('', '_blank');
+                    let htmlContent = `
+                      <!DOCTYPE html>
+                      <html>
+                      <head>
+                        <title>All Payslips - ${payrollData.payPeriod}</title>
+                        <style>
+                          @page {
+                            size: A4;
+                            margin: 15mm 15mm 15mm 15mm;
+                          }
+                          body { 
+                            font-family: Arial, sans-serif; 
+                            margin: 0; 
+                            padding: 0; 
+                            font-size: 12px;
+                            line-height: 1.4;
+                            color: #000;
+                          }
+                          .payslip { 
+                            page-break-after: always; 
+                            width: 100%;
+                            height: 100vh;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: space-between;
+                            padding: 10mm 0;
+                          }
+                          .payslip:last-child { page-break-after: auto; }
+                          .header { 
+                            text-align: center; 
+                            margin-bottom: 20px; 
+                            border-bottom: 2px solid #000;
+                            padding-bottom: 10px;
+                          }
+                          .company-name { 
+                            font-size: 18px; 
+                            font-weight: bold; 
+                            margin-bottom: 3px; 
+                            letter-spacing: 1px;
+                          }
+                          .company-address { 
+                            font-size: 11px; 
+                            color: #333; 
+                            margin-bottom: 5px;
+                          }
+                          .payslip-title { 
+                            font-size: 16px; 
+                            font-weight: bold; 
+                            margin: 15px 0; 
+                            text-align: center;
+                            text-decoration: underline;
+                          }
+                          .employee-info { 
+                            display: flex; 
+                            justify-content: space-between; 
+                            margin-bottom: 20px;
+                            border: 1px solid #ccc;
+                            padding: 10px;
+                            background-color: #f9f9f9;
+                          }
+                          .info-section { width: 48%; }
+                          .info-row { 
+                            display: flex; 
+                            justify-content: space-between; 
+                            margin-bottom: 4px;
+                            font-size: 11px;
+                          }
+                          .label { 
+                            font-weight: bold; 
+                            width: 45%;
+                          }
+                          .value {
+                            width: 55%;
+                            text-align: left;
+                          }
+                          .earnings-deductions { 
+                            display: flex; 
+                            justify-content: space-between; 
+                            margin-top: 15px;
+                            flex: 1;
+                          }
+                          .earnings, .deductions { 
+                            width: 48%; 
+                            border: 1px solid #333;
+                            padding: 10px;
+                          }
+                          .section-title { 
+                            font-weight: bold; 
+                            font-size: 14px; 
+                            margin-bottom: 8px;
+                            text-align: center;
+                            background-color: #e0e0e0;
+                            padding: 5px;
+                            margin: -10px -10px 10px -10px;
+                          }
+                          .amount-row { 
+                            display: flex; 
+                            justify-content: space-between; 
+                            margin-bottom: 3px;
+                            font-size: 11px;
+                            padding: 2px 0;
+                          }
+                          .total-row { 
+                            border-top: 2px solid #000; 
+                            padding-top: 5px; 
+                            margin-top: 8px; 
+                            font-weight: bold;
+                            font-size: 12px;
+                          }
+                          .net-pay { 
+                            text-align: center; 
+                            margin-top: 15px; 
+                            padding: 8px; 
+                            background-color: #f0f0f0; 
+                            font-size: 16px; 
+                            font-weight: bold;
+                            border: 2px solid #000;
+                          }
+                          .amount-words { 
+                            margin-top: 10px; 
+                            font-style: italic;
+                            font-size: 11px;
+                            text-align: center;
+                            padding: 5px;
+                            border: 1px dashed #666;
+                          }
+                          .footer {
+                            margin-top: 15px;
+                            text-align: center;
+                            font-size: 10px;
+                            color: #666;
+                            border-top: 1px solid #ccc;
+                            padding-top: 5px;
+                          }
+                          @media print {
+                            body { 
+                              margin: 0;
+                              -webkit-print-color-adjust: exact;
+                              print-color-adjust: exact;
+                            }
+                            .payslip { 
+                              page-break-after: always;
+                              height: auto;
+                              min-height: 90vh;
+                            }
+                            .payslip:last-child {
+                              page-break-after: auto;
+                            }
+                          }
+                        </style>
+                      </head>
+                      <body>
+                    `;
+
+                    payslips.forEach((payslip, index) => {
+                      const calculatedPayslip = calculatePayslip(payslip);
+                      htmlContent += `
+                        <div class="payslip">
+                          <div class="header">
+                            <div class="company-name">SPF & CM ENTERPRISES LIMITED</div>
+                            <div class="company-address">2670 Town Area, Senanga Rd.</div>
+                          </div>
+                          
+                          <div class="payslip-title">Payslip</div>
+                          
+                          <div class="employee-info">
+                            <div class="info-section">
+                              <div class="info-row"><span class="label">Employee Number:</span> <span class="value">${payslip.id}</span></div>
+                              <div class="info-row"><span class="label">Date of Joining:</span> <span class="value">${payslip.dateOfJoining}</span></div>
+                              <div class="info-row"><span class="label">Pay Period:</span> <span class="value">${payslip.payrollPeriod}</span></div>
+                              <div class="info-row"><span class="label">Worked Days:</span> <span class="value">${payslip.workedDays || payrollData.workedDays}</span></div>
+                              <div class="info-row"><span class="label">Designation:</span> <span class="value">${payslip.designation}</span></div>
+                            </div>
+                            <div class="info-section">
+                              <div class="info-row"><span class="label">Employee Name:</span> <span class="value">${payslip.name}</span></div>
+                              <div class="info-row"><span class="label">Gender:</span> <span class="value">${payslip.gender}</span></div>
+                              <div class="info-row"><span class="label">NRC:</span> <span class="value">${payslip.nrc}</span></div>
+                              <div class="info-row"><span class="label">SSN:</span> <span class="value">${payslip.ssn}</span></div>
+                            </div>
+                          </div>
+                          
+                          <div class="earnings-deductions">
+                            <div class="earnings">
+                              <div class="section-title">Earnings</div>
+                              <div class="amount-row"><span>Basic</span> <span>ZMW ${payslip.basicPay.toFixed(2)}</span></div>
+                              <div class="amount-row"><span>Transport Allowance</span> <span>ZMW ${payslip.transportAllowance.toFixed(2)}</span></div>
+                              <div class="amount-row"><span>House Rent Allowance</span> <span>ZMW ${calculatedPayslip.houseRentAllowance.toFixed(2)}</span></div>
+                              <div class="amount-row"><span>Meal Allowance</span> <span>ZMW ${payslip.mealAllowance.toFixed(2)}</span></div>
+                              ${(payslip.otherEarnings || []).map(earning => 
+                                `<div class="amount-row"><span>${earning.name}</span> <span>ZMW ${earning.amount.toFixed(2)}</span></div>`
+                              ).join('')}
+                              <div class="amount-row total-row"><span>Total Earnings</span> <span>ZMW ${calculatedPayslip.totalEarnings.toFixed(2)}</span></div>
+                            </div>
+                            
+                            <div class="deductions">
+                              <div class="section-title">Deductions</div>
+                              <div class="amount-row"><span>NAPSA</span> <span>ZMW ${calculatedPayslip.deductions.napsa.toFixed(2)}</span></div>
+                              <div class="amount-row"><span>NHIMA</span> <span>ZMW ${calculatedPayslip.deductions.nhima.toFixed(2)}</span></div>
+                              <div class="amount-row"><span>Loan</span> <span>ZMW ${calculatedPayslip.deductions.loan.toFixed(2)}</span></div>
+                              ${(payslip.otherDeductions || []).map(deduction => 
+                                `<div class="amount-row"><span>${deduction.name}</span> <span>ZMW ${deduction.amount.toFixed(2)}</span></div>`
+                              ).join('')}
+                              <div class="amount-row total-row"><span>Total Deductions</span> <span>ZMW ${calculatedPayslip.totalDeductions.toFixed(2)}</span></div>
+                            </div>
+                          </div>
+                          
+                          <div class="net-pay">
+                            Net Pay: ZMW ${calculatedPayslip.netPay.toFixed(2)}
+                          </div>
+                          
+                          <div class="amount-words">
+                            Amount in words: ${numberToWords(calculatedPayslip.netPay)}
+                          </div>
+                          
+                          <div class="footer">
+                            Generated on ${new Date().toLocaleDateString()} | Page ${index + 1} of ${payslips.length}
+                          </div>
+                        </div>
+                      `;
+                    });
+
+                    htmlContent += `
+                      </body>
+                      </html>
+                    `;
+
+                    printWindow.document.write(htmlContent);
+                    printWindow.document.close();
+                    printWindow.focus();
+                    setTimeout(() => {
+                      printWindow.print();
+                    }, 500);
+                  };
+                  exportAllPayslips();
+                }}
+                disabled={payslips.length === 0}
+                className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-colors ${
+                  payslips.length === 0 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
+              >
+                <Download className="h-3 w-3" />
+                Export All PDF
+              </button>
+              <button
+                onClick={() => setCurrentView('addPayslip')}
+                className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+                Add Payslip
+              </button>
+            </div>
           </div>
         </div>
         
-        {/* Desktop Table View */}
+        {/* Compact Table View */}
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-white border-b border-gray-300">
+          <table className="w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 uppercase">Employee</th>
-                <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 uppercase">Designation</th>
-                <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 uppercase">Pay Period</th>
-                <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 uppercase">Net Pay</th>
-                <th className="px-6 py-3 text-left text-sm font-bold text-gray-900 uppercase">Actions</th>
+                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <div className="flex items-center space-x-1">
+                    <span>Employee</span>
+                    <svg className="h-3 w-3 text-gray-400 cursor-pointer hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                    </svg>
+                  </div>
+                </th>
+                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Role
+                </th>
+                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <div className="flex items-center space-x-1">
+                    <span>Basic Pay</span>
+                    <svg className="h-3 w-3 text-gray-400 cursor-pointer hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                    </svg>
+                  </div>
+                </th>
+                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Earnings
+                </th>
+                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Deductions
+                </th>
+                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <div className="flex items-center space-x-1">
+                    <span>Net Pay</span>
+                    <svg className="h-3 w-3 text-gray-400 cursor-pointer hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                    </svg>
+                  </div>
+                </th>
+                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th scope="col" className="relative px-3 py-2">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
-            <tbody className="bg-white">
+            <tbody className="bg-white divide-y divide-gray-200">
               {payslips.map((payslip, index) => {
                 const calculatedPayslip = calculatePayslip(payslip);
                 return (
-                  <tr key={index} className={`${index !== payslips.length - 1 ? 'border-b border-gray-300' : ''}`}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 uppercase">{payslip.name}</div>
-                        <div className="text-sm text-gray-600">{payslip.id}</div>
+                  <tr key={index} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-medium text-gray-700">
+                            {payslip.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                          </span>
+                        </div>
+                        <div className="ml-2 min-w-0 flex-1">
+                          <div className="text-sm font-medium text-gray-900 truncate">{payslip.name}</div>
+                          <div className="text-xs text-gray-500">{payslip.id}</div>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 uppercase">{payslip.designation}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payslip.payrollPeriod}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">ZMW {calculatedPayslip.netPay.toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex items-center gap-2">
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">
+                        {payslip.designation}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      {payslip.basicPay.toFixed(0)}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                      {calculatedPayslip.totalEarnings.toFixed(0)}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-red-600">
+                      {calculatedPayslip.totalDeductions.toFixed(0)}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm font-semibold text-green-600">
+                      {calculatedPayslip.netPay.toFixed(0)}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">
+                        Ready
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-right text-sm">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => generatePayslip(payslip)}
-                          className="bg-gray-100 text-gray-700 px-3 py-1 rounded border border-gray-300 flex items-center gap-1 hover:bg-gray-200 transition-colors text-xs"
+                          className="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-blue-500 transition-colors"
+                          title="View Payslip"
                         >
                           <FileText className="h-3 w-3" />
-                          View Payslip
+                        </button>
+                        <button
+                          onClick={() => {
+                            generatePayslip(payslip);
+                            setTimeout(() => window.print(), 100);
+                          }}
+                          className="inline-flex items-center px-2 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-green-500 transition-colors"
+                          title="Print Payslip"
+                        >
+                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                          </svg>
                         </button>
                         <button
                           onClick={() => deletePayslip(index)}
-                          className="bg-gray-100 text-gray-700 px-3 py-1 rounded border border-gray-300 flex items-center gap-1 hover:bg-gray-200 transition-colors text-xs"
+                          className="inline-flex items-center px-2 py-1 border border-red-300 shadow-sm text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-red-500 transition-colors"
+                          title="Delete Payslip"
                         >
                           <Trash2 className="h-3 w-3" />
-                          Delete
                         </button>
                       </div>
                     </td>
@@ -459,14 +804,60 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               })}
               {payslips.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
-                    No payslips created yet. Click "Add Payslip" to get started.
+                  <td colSpan="8" className="px-3 py-8 text-center">
+                    <div className="flex flex-col items-center">
+                      <svg className="h-10 w-10 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <h3 className="text-sm font-medium text-gray-900 mb-1">No payslips created</h3>
+                      <p className="text-xs text-gray-500 mb-3">Get started by creating your first payslip</p>
+                      <button
+                        onClick={() => setCurrentView('addPayslip')}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Create Payslip
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Compact Table Footer with Summary */}
+        {payslips.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-xs">
+              <div className="text-gray-600">
+                {payslips.length} payslip{payslips.length !== 1 ? 's' : ''} • {payrollData.payPeriod}
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-gray-600">
+                <div className="flex items-center gap-4">
+                  <span>Total: <span className="font-semibold text-gray-900">
+                    {payslips.reduce((sum, payslip) => {
+                      const calculatedPayslip = calculatePayslip(payslip);
+                      return sum + calculatedPayslip.totalEarnings;
+                    }, 0).toFixed(0)}
+                  </span></span>
+                  <span>Deductions: <span className="font-semibold text-red-600">
+                    {payslips.reduce((sum, payslip) => {
+                      const calculatedPayslip = calculatePayslip(payslip);
+                      return sum + calculatedPayslip.totalDeductions;
+                    }, 0).toFixed(0)}
+                  </span></span>
+                  <span>Net: <span className="font-semibold text-green-600">
+                    {payslips.reduce((sum, payslip) => {
+                      const calculatedPayslip = calculatePayslip(payslip);
+                      return sum + calculatedPayslip.netPay;
+                    }, 0).toFixed(0)}
+                  </span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -719,7 +1110,9 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
   };
 
   const renderPayslip = () => {
-    if (!selectedEmployee) return null;
+    if (!selectedEmployee) {
+      return null;
+    }
 
     return (
     
@@ -1196,90 +1589,389 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                   return;
                 }
                 
-                // Create print preview window
-                const reportElement = document.getElementById('wage-bill-report');
-                if (reportElement) {
-                  const printWindow = window.open('', '_blank', 'width=800,height=600');
-                  const reportHTML = reportElement.outerHTML;
-                  
-                  printWindow.document.write(`
-                    <!DOCTYPE html>
-                    <html lang="en">
-                    <head>
-                      <meta charset="UTF-8">
-                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                      <title>Wage Bill Report Preview - ${new Date().toLocaleDateString()}</title>
-                      <script src="https://cdn.tailwindcss.com"></script>
-                      <style>
-                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-                        body { font-family: 'Inter', sans-serif; margin: 20px; }
-                        .no-print { display: none !important; }
-                        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-                        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
-                        th { background-color: #f5f5f5; }
-                        .bg-blue-600, .bg-blue-800 { background-color: #1e40af !important; color: white !important; }
-                        .text-white { color: white !important; }
-                        .rounded-lg { border-radius: 8px; }
-                        .p-6 { padding: 24px; }
-                        .mb-2 { margin-bottom: 8px; }
-                        .mb-4 { margin-bottom: 16px; }
-                        .mb-6 { margin-bottom: 24px; }
-                        .text-2xl { font-size: 24px; }
-                        .text-lg { font-size: 18px; }
-                        .text-sm { font-size: 14px; }
-                        .font-bold { font-weight: bold; }
-                        .font-semibold { font-weight: 600; }
-                        .grid { display: grid; }
-                        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-                        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-                        .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-                        .gap-4 { gap: 16px; }
-                        .gap-6 { gap: 24px; }
-                        .space-y-6 > * + * { margin-top: 24px; }
-                        .space-y-3 > * + * { margin-top: 12px; }
-                        .border { border: 1px solid #d1d5db; }
-                        .border-gray-300 { border-color: #d1d5db; }
-                        .bg-white { background-color: white; }
-                        .bg-gray-50 { background-color: #f9fafb; }
-                        .text-gray-900 { color: #111827; }
-                        .text-gray-600 { color: #4b5563; }
-                        .text-green-600 { color: #059669; }
-                        .text-red-600 { color: #dc2626; }
-                        .text-blue-600 { color: #2563eb; }
-                        .overflow-x-auto { overflow-x: auto; }
-                        .px-4 { padding-left: 16px; padding-right: 16px; }
-                        .py-3 { padding-top: 12px; padding-bottom: 12px; }
-                        .px-6 { padding-left: 24px; padding-right: 24px; }
-                        .py-4 { padding-top: 16px; padding-bottom: 16px; }
-                        .flex { display: flex; }
-                        .items-center { align-items: center; }
-                        .justify-between { justify-content: space-between; }
-                        .text-right { text-align: right; }
-                        .hover\\:bg-gray-50:hover { background-color: #f9fafb; }
-                        .divide-y > * + * { border-top: 1px solid #e5e7eb; }
-                        @media print {
-                          body { margin: 0; }
-                          .no-print { display: none !important; }
+                // Create simplified print preview window
+                const printWindow = window.open('', '_blank', 'width=1000,height=700');
+                
+                // Prepare simplified report data
+                const calculatedPayslips = payslips.map(payslip => calculatePayslip(payslip));
+                const totalWageBill = calculatedPayslips.reduce((sum, p) => sum + p.netPay, 0);
+                const totalGrossWages = calculatedPayslips.reduce((sum, p) => sum + p.totalEarnings, 0);
+                
+                const reportHTML = `
+                  <!DOCTYPE html>
+                  <html lang="en">
+                  <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Wage Bill Report - ${new Date().toLocaleDateString()}</title>
+                    <style>
+                      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+                      
+                      * {
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                      }
+                      
+                      body {
+                        font-family: 'Inter', sans-serif;
+                        line-height: 1.5;
+                        color: #111827;
+                        background: white;
+                        margin: 20px;
+                      }
+                      
+                      .header {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        padding-bottom: 20px;
+                        border-bottom: 2px solid #1e40af;
+                      }
+                      
+                      .company-title {
+                        font-size: 28px;
+                        font-weight: 700;
+                        color: #1e40af;
+                        margin-bottom: 8px;
+                      }
+                      
+                      .report-title {
+                        font-size: 20px;
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 5px;
+                      }
+                      
+                      .report-date {
+                        font-size: 14px;
+                        color: #6b7280;
+                      }
+                      
+                      .summary-section {
+                        display: flex;
+                        justify-content: center;
+                        gap: 50px;
+                        margin-bottom: 30px;
+                        padding: 20px;
+                        background-color: #f9fafb;
+                        border-radius: 8px;
+                        border: 1px solid #e5e7eb;
+                      }
+                      
+                      .summary-card {
+                        text-align: center;
+                        padding: 15px;
+                      }
+                      
+                      .summary-label {
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #6b7280;
+                        margin-bottom: 5px;
+                      }
+                      
+                      .summary-amount {
+                        font-size: 24px;
+                        font-weight: 700;
+                        color: #059669;
+                      }
+                      
+                      .table-section {
+                        margin-bottom: 30px;
+                      }
+                      
+                      .table-title {
+                        font-size: 18px;
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 15px;
+                      }
+                      
+                      table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 20px;
+                        border: 2px solid #d1d5db;
+                      }
+                      
+                      th {
+                        background-color: #f3f4f6;
+                        padding: 12px 8px;
+                        text-align: left;
+                        font-weight: 600;
+                        font-size: 12px;
+                        color: #374151;
+                        border: 1px solid #d1d5db;
+                        text-transform: uppercase;
+                      }
+                      
+                      td {
+                        padding: 10px 8px;
+                        border: 1px solid #d1d5db;
+                        font-size: 12px;
+                        color: #374151;
+                      }
+                      
+                      tr:nth-child(even) {
+                        background-color: #f9fafb;
+                      }
+                      
+                      tr:hover {
+                        background-color: #f3f4f6;
+                      }
+                      
+                      .amount {
+                        text-align: right;
+                        font-weight: 500;
+                      }
+                      
+                      .net-pay {
+                        color: #059669;
+                        font-weight: 600;
+                      }
+                      
+                      .gross-pay {
+                        color: #2563eb;
+                        font-weight: 500;
+                      }
+                      
+                      .deductions {
+                        color: #dc2626;
+                        font-weight: 500;
+                      }
+                      
+                      .employee-name {
+                        font-weight: 500;
+                        text-transform: uppercase;
+                      }
+                      
+                      .approval-section {
+                        margin: 40px 0;
+                        padding: 30px;
+                        background-color: #f8fffe;
+                        border: 2px solid #059669;
+                        border-radius: 12px;
+                      }
+                      
+                      .total-amount-card {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        padding: 25px;
+                        background: linear-gradient(135deg, #059669, #047857);
+                        color: white;
+                        border-radius: 10px;
+                        box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);
+                      }
+                      
+                      .total-label {
+                        font-size: 16px;
+                        font-weight: 600;
+                        margin-bottom: 10px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                      }
+                      
+                      .total-value {
+                        font-size: 32px;
+                        font-weight: 800;
+                        margin-bottom: 8px;
+                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                      }
+                      
+                      .approval-note {
+                        font-size: 13px;
+                        font-weight: 400;
+                        opacity: 0.9;
+                        font-style: italic;
+                      }
+                      
+                      .signature-section {
+                        display: flex;
+                        justify-content: space-between;
+                        gap: 40px;
+                        margin-top: 30px;
+                      }
+                      
+                      .signature-box {
+                        flex: 1;
+                        text-align: center;
+                      }
+                      
+                      .signature-line {
+                        width: 100%;
+                        height: 50px;
+                        border-bottom: 2px solid #374151;
+                        margin-bottom: 10px;
+                      }
+                      
+                      .signature-label {
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 8px;
+                      }
+                      
+                      .signature-date {
+                        font-size: 12px;
+                        color: #6b7280;
+                        font-style: italic;
+                      }
+
+                      .footer {
+                        text-align: center;
+                        margin-top: 40px;
+                        padding-top: 20px;
+                        border-top: 1px solid #e5e7eb;
+                        font-size: 12px;
+                        color: #6b7280;
+                      }
+                      
+                      .print-controls {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        padding: 15px;
+                        background-color: #eff6ff;
+                        border-radius: 8px;
+                        border: 1px solid #bfdbfe;
+                      }
+                      
+                      .print-btn {
+                        background: #1e40af;
+                        color: white;
+                        padding: 10px 20px;
+                        border: none;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        margin: 0 5px;
+                        font-weight: 500;
+                        font-size: 14px;
+                      }
+                      
+                      .print-btn:hover {
+                        background: #1d4ed8;
+                      }
+                      
+                      .close-btn {
+                        background: #6b7280;
+                      }
+                      
+                      .close-btn:hover {
+                        background: #4b5563;
+                      }
+                      
+                      @media print {
+                        body {
+                          margin: 0;
                         }
-                      </style>
-                    </head>
-                    <body>
-                      <div style="text-align: center; margin-bottom: 20px;">
-                        <button onclick="window.print()" style="background: #1e40af; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
-                          🖨️ Print This Report
-                        </button>
-                        <button onclick="window.close()" style="background: #6b7280; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">
-                          ✕ Close Preview
-                        </button>
+                        
+                        .print-controls {
+                          display: none !important;
+                        }
+                        
+                        .summary-section {
+                          break-inside: avoid;
+                        }
+                        
+                        table {
+                          break-inside: avoid;
+                        }
+                        
+                        @page {
+                          margin: 0.5in;
+                          size: A4;
+                        }
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="print-controls">
+                      <button class="print-btn" onclick="window.print()">
+                        🖨️ Print Report
+                      </button>
+                      <button class="print-btn close-btn" onclick="window.close()">
+                        ✕ Close Preview
+                      </button>
+                    </div>
+                    
+                    <div class="header">
+                      <div class="company-title">SPF & CM ENTERPRISES LIMITED</div>
+                      <div class="report-title">Wage Bill Report</div>
+                      <div class="report-date">Generated on ${new Date().toLocaleDateString()}</div>
+                    </div>
+                    
+                    <div class="summary-section">
+                      <div class="summary-card">
+                        <div class="summary-label">Total Wage Bill</div>
+                        <div class="summary-amount">ZMW ${totalWageBill.toFixed(2)}</div>
                       </div>
-                      ${reportHTML}
-                    </body>
-                    </html>
-                  `);
-                  printWindow.document.close();
-                } else {
-                  alert('Report content not found. Please refresh and try again.');
-                }
+                      <div class="summary-card">
+                        <div class="summary-label">Total Gross Wages</div>
+                        <div class="summary-amount">ZMW ${totalGrossWages.toFixed(2)}</div>
+                      </div>
+                    </div>
+                    
+                    <div class="table-section">
+                      <div class="table-title">Employee Payroll Details</div>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Pay Period</th>
+                            <th>Employee Name</th>
+                            <th>Basic Pay</th>
+                            <th>Allowances</th>
+                            <th>Gross Pay</th>
+                            <th>Deductions</th>
+                            <th>Net Pay</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${calculatedPayslips.map(payslip => `
+                            <tr>
+                              <td>${payslip.payrollPeriod || 'N/A'}</td>
+                              <td class="employee-name">${payslip.name}</td>
+                              <td class="amount">ZMW ${payslip.basicPay.toFixed(2)}</td>
+                              <td class="amount">ZMW ${(payslip.transportAllowance + payslip.houseRentAllowance + payslip.mealAllowance + (payslip.otherEarningsTotal || 0)).toFixed(2)}</td>
+                              <td class="amount gross-pay">ZMW ${payslip.totalEarnings.toFixed(2)}</td>
+                              <td class="amount deductions">ZMW ${payslip.totalDeductions.toFixed(2)}</td>
+                              <td class="amount net-pay">ZMW ${payslip.netPay.toFixed(2)}</td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    <div class="approval-section">
+                      <div class="total-amount-card">
+                        <div class="total-label">Total Amount to be Paid to Employees</div>
+                        <div class="total-value">ZMW ${totalWageBill.toFixed(2)}</div>
+                        <div class="approval-note">This amount requires management approval for payroll processing</div>
+                      </div>
+                      
+                      <div class="signature-section">
+                        <div class="signature-box">
+                          <div class="signature-line"></div>
+                          <div class="signature-label">Prepared By: ________________________</div>
+                          <div class="signature-date">Date: ________________________</div>
+                        </div>
+                        
+                        <div class="signature-box">
+                          <div class="signature-line"></div>
+                          <div class="signature-label">Approved By: ________________________</div>
+                          <div class="signature-date">Date: ________________________</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="footer">
+                      <p>This is a system generated report - SPF & CM Enterprises Limited</p>
+                      <p>Report generated on ${new Date().toLocaleString()}</p>
+                    </div>
+                  </body>
+                  </html>
+                `;
+                
+                printWindow.document.write(reportHTML);
+                printWindow.document.close();
               }}
               className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 transition-colors"
             >
@@ -1294,24 +1986,341 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                   return;
                 }
                 
-                // Ensure the report content is visible before printing
-                const reportElement = document.getElementById('wage-bill-report');
-                if (reportElement) {
-                  // Set document title for print
-                  const originalTitle = document.title;
-                  document.title = `Wage Bill Report - ${new Date().toLocaleDateString()}`;
-                  
-                  // Add a small delay to ensure styles are applied
-                  setTimeout(() => {
-                    window.print();
-                    // Restore original title after printing
-                    setTimeout(() => {
-                      document.title = originalTitle;
-                    }, 1000);
-                  }, 100);
-                } else {
-                  alert('Report content not found. Please refresh and try again.');
-                }
+                // Prepare simplified report data
+                const calculatedPayslips = payslips.map(payslip => calculatePayslip(payslip));
+                const totalWageBill = calculatedPayslips.reduce((sum, p) => sum + p.netPay, 0);
+                const totalGrossWages = calculatedPayslips.reduce((sum, p) => sum + p.totalEarnings, 0);
+                
+                // Create a temporary window for printing
+                const printWindow = window.open('', '_blank', 'width=1000,height=700');
+                
+                const reportHTML = `
+                  <!DOCTYPE html>
+                  <html lang="en">
+                  <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Wage Bill Report - ${new Date().toLocaleDateString()}</title>
+                    <style>
+                      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+                      
+                      * {
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                      }
+                      
+                      body {
+                        font-family: 'Inter', sans-serif;
+                        line-height: 1.5;
+                        color: #111827;
+                        background: white;
+                        margin: 20px;
+                      }
+                      
+                      .header {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        padding-bottom: 20px;
+                        border-bottom: 2px solid #1e40af;
+                      }
+                      
+                      .company-title {
+                        font-size: 28px;
+                        font-weight: 700;
+                        color: #1e40af;
+                        margin-bottom: 8px;
+                      }
+                      
+                      .report-title {
+                        font-size: 20px;
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 5px;
+                      }
+                      
+                      .report-date {
+                        font-size: 14px;
+                        color: #6b7280;
+                      }
+                      
+                      .summary-section {
+                        display: flex;
+                        justify-content: center;
+                        gap: 50px;
+                        margin-bottom: 30px;
+                        padding: 20px;
+                        background-color: #f9fafb;
+                        border-radius: 8px;
+                        border: 1px solid #e5e7eb;
+                      }
+                      
+                      .summary-card {
+                        text-align: center;
+                        padding: 15px;
+                      }
+                      
+                      .summary-label {
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #6b7280;
+                        margin-bottom: 5px;
+                      }
+                      
+                      .summary-amount {
+                        font-size: 24px;
+                        font-weight: 700;
+                        color: #059669;
+                      }
+                      
+                      .table-section {
+                        margin-bottom: 30px;
+                      }
+                      
+                      .table-title {
+                        font-size: 18px;
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 15px;
+                      }
+                      
+                      table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 20px;
+                        border: 2px solid #d1d5db;
+                      }
+                      
+                      th {
+                        background-color: #f3f4f6;
+                        padding: 12px 8px;
+                        text-align: left;
+                        font-weight: 600;
+                        font-size: 12px;
+                        color: #374151;
+                        border: 1px solid #d1d5db;
+                        text-transform: uppercase;
+                      }
+                      
+                      td {
+                        padding: 10px 8px;
+                        border: 1px solid #d1d5db;
+                        font-size: 12px;
+                        color: #374151;
+                      }
+                      
+                      tr:nth-child(even) {
+                        background-color: #f9fafb;
+                      }
+                      
+                      tr:hover {
+                        background-color: #f3f4f6;
+                      }
+                      
+                      .amount {
+                        text-align: right;
+                        font-weight: 500;
+                      }
+                      
+                      .net-pay {
+                        color: #059669;
+                        font-weight: 600;
+                      }
+                      
+                      .gross-pay {
+                        color: #2563eb;
+                        font-weight: 500;
+                      }
+                      
+                      .deductions {
+                        color: #dc2626;
+                        font-weight: 500;
+                      }
+                      
+                      .employee-name {
+                        font-weight: 500;
+                        text-transform: uppercase;
+                      }
+                      
+                      .approval-section {
+                        margin: 40px 0;
+                        padding: 30px;
+                        background-color: #f8fffe;
+                        border: 2px solid #059669;
+                        border-radius: 12px;
+                      }
+                      
+                      .total-amount-card {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        padding: 25px;
+                        background: linear-gradient(135deg, #059669, #047857);
+                        color: white;
+                        border-radius: 10px;
+                        box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);
+                      }
+                      
+                      .total-label {
+                        font-size: 16px;
+                        font-weight: 600;
+                        margin-bottom: 10px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                      }
+                      
+                      .total-value {
+                        font-size: 32px;
+                        font-weight: 800;
+                        margin-bottom: 8px;
+                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                      }
+                      
+                      .approval-note {
+                        font-size: 13px;
+                        font-weight: 400;
+                        opacity: 0.9;
+                        font-style: italic;
+                      }
+                      
+                      .signature-section {
+                        display: flex;
+                        justify-content: space-between;
+                        gap: 40px;
+                        margin-top: 30px;
+                      }
+                      
+                      .signature-box {
+                        flex: 1;
+                        text-align: center;
+                      }
+                      
+                      .signature-line {
+                        width: 100%;
+                        height: 50px;
+                        border-bottom: 2px solid #374151;
+                        margin-bottom: 10px;
+                      }
+                      
+                      .signature-label {
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 8px;
+                      }
+                      
+                      .signature-date {
+                        font-size: 12px;
+                        color: #6b7280;
+                        font-style: italic;
+                      }
+                      
+                      .footer {
+                        text-align: center;
+                        margin-top: 40px;
+                        padding-top: 20px;
+                        border-top: 1px solid #e5e7eb;
+                        font-size: 12px;
+                        color: #6b7280;
+                      }
+                      
+                      @media print {
+                        body {
+                          margin: 0;
+                        }
+                        
+                        @page {
+                          margin: 0.5in;
+                          size: A4;
+                        }
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="header">
+                      <div class="company-title">SPF & CM ENTERPRISES LIMITED</div>
+                      <div class="report-title">Wage Bill Report</div>
+                      <div class="report-date">Generated on ${new Date().toLocaleDateString()}</div>
+                    </div>
+                    
+                    <div class="summary-section">
+                      <div class="summary-card">
+                        <div class="summary-label">Total Wage Bill</div>
+                        <div class="summary-amount">ZMW ${totalWageBill.toFixed(2)}</div>
+                      </div>
+                      <div class="summary-card">
+                        <div class="summary-label">Total Gross Wages</div>
+                        <div class="summary-amount">ZMW ${totalGrossWages.toFixed(2)}</div>
+                      </div>
+                    </div>
+                    
+                    <div class="table-section">
+                      <div class="table-title">Employee Payroll Details</div>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Pay Period</th>
+                            <th>Employee Name</th>
+                            <th>Basic Pay</th>
+                            <th>Allowances</th>
+                            <th>Gross Pay</th>
+                            <th>Deductions</th>
+                            <th>Net Pay</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${calculatedPayslips.map(payslip => `
+                            <tr>
+                              <td>${payslip.payrollPeriod || 'N/A'}</td>
+                              <td class="employee-name">${payslip.name}</td>
+                              <td class="amount">ZMW ${payslip.basicPay.toFixed(2)}</td>
+                              <td class="amount">ZMW ${(payslip.transportAllowance + payslip.houseRentAllowance + payslip.mealAllowance + (payslip.otherEarningsTotal || 0)).toFixed(2)}</td>
+                              <td class="amount gross-pay">ZMW ${payslip.totalEarnings.toFixed(2)}</td>
+                              <td class="amount deductions">ZMW ${payslip.totalDeductions.toFixed(2)}</td>
+                              <td class="amount net-pay">ZMW ${payslip.netPay.toFixed(2)}</td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    <div class="approval-section">
+                      <div class="total-amount-card">
+                        <div class="total-label">Total Amount to be Paid to Employees</div>
+                        <div class="total-value">ZMW ${totalWageBill.toFixed(2)}</div>
+                        <div class="approval-note">This amount requires management approval for payroll processing</div>
+                      </div>
+                      
+                      <div class="signature-section">
+                        <div class="signature-box">
+                          <div class="signature-line"></div>
+                          <div class="signature-label">Prepared By: ________________________</div>
+                          <div class="signature-date">Date: ________________________</div>
+                        </div>
+                        
+                        <div class="signature-box">
+                          <div class="signature-line"></div>
+                          <div class="signature-label">Approved By: ________________________</div>
+                          <div class="signature-date">Date: ________________________</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="footer">
+                      <p>This is a system generated report - SPF & CM Enterprises Limited</p>
+                      <p>Report generated on ${new Date().toLocaleString()}</p>
+                    </div>
+                  </body>
+                  </html>
+                `;
+                
+                printWindow.document.write(reportHTML);
+                printWindow.document.close();
+                
+                // Auto-trigger print dialog
+                printWindow.onload = function() {
+                  printWindow.print();
+                  printWindow.close();
+                };
               }}
               className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700 transition-colors"
             >

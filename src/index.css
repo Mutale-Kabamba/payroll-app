@@ -155,6 +155,108 @@
   }
 }
 
+/* A4 Print Styles for Individual Payslips */
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm 15mm 20mm 15mm;
+  }
+  
+  body {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  #payslip {
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+  
+  /* Adjust heading sizes for print */
+  .text-2xl, .text-3xl {
+    font-size: 18px !important;
+  }
+  
+  .text-xl {
+    font-size: 16px !important;
+  }
+  
+  .text-lg {
+    font-size: 14px !important;
+  }
+  
+  .text-base {
+    font-size: 12px !important;
+  }
+  
+  .text-sm {
+    font-size: 11px !important;
+  }
+  
+  .text-xs {
+    font-size: 10px !important;
+  }
+  
+  /* Compact spacing for print */
+  .mb-8 {
+    margin-bottom: 15px !important;
+  }
+  
+  .mb-6 {
+    margin-bottom: 12px !important;
+  }
+  
+  .mb-4 {
+    margin-bottom: 8px !important;
+  }
+  
+  .p-8, .lg\\:p-12 {
+    padding: 10px !important;
+  }
+  
+  .p-6 {
+    padding: 8px !important;
+  }
+  
+  .p-4 {
+    padding: 6px !important;
+  }
+  
+  /* Table adjustments for print */
+  table {
+    font-size: 11px !important;
+  }
+  
+  th, td {
+    padding: 4px 6px !important;
+  }
+  
+  /* Ensure proper page breaks */
+  .page-break-before {
+    page-break-before: always;
+  }
+  
+  .page-break-after {
+    page-break-after: always;
+  }
+  
+  .page-break-inside-avoid {
+    page-break-inside: avoid;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
