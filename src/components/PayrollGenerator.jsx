@@ -51,10 +51,12 @@ useEffect(() => {
         try {
             // Load employees from sync service
             const employees = await syncDatabaseService.getEmployees();
+            console.log('Loaded employees:', employees);
             setEmployeeDatabase(employees);
 
             // Load payslips from sync service
             const savedPayslips = await syncDatabaseService.getPayslips();
+            console.log('Loaded payslips:', savedPayslips);
             setPayslips(savedPayslips);
 
             // Load payroll settings from sync service
@@ -399,19 +401,30 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
       showLoading('Generating payslip...');
 
-      // Generate payslip with proper ID
+      // Generate payslip with proper ID and flatten employee data for easier access
       const payslipId = `PS_${employee.id}_${Date.now()}`;
       const newPayslip = {
-        id: payslipId, // Ensure unique ID
-        employee: employee,
+        id: payslipId,
+        // Employee info flattened for easier access in table
+        employeeId: employee.id,
+        name: employee.name,
+        designation: employee.designation,
+        nrc: employee.nrc,
+        // Payroll data
         payPeriod: payrollData.payPeriod,
         workedDays: payrollData.workedDays,
         totalDays: payrollData.totalDays,
         basicPay: parseFloat(employee.basicPay) || 0,
         transportAllowance: parseFloat(employee.transportAllowance) || 0,
         mealAllowance: parseFloat(employee.mealAllowance) || 0,
+        department: employee.department || '',
+        address: employee.address || '',
+        // Keep full employee object for backward compatibility
+        employee: employee,
         createdAt: new Date().toISOString(),
-        // ... other payslip data
+        // Initialize other earnings and deductions as empty arrays
+        otherEarnings: [],
+        otherDeductions: []
       };
 
       // Save to database
@@ -470,18 +483,36 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
   };
 
   const deletePayslip = (payslipId) => {
+    console.log('Delete payslip called with ID:', payslipId);
+    console.log('Current payslips:', payslips);
+    
+    const payslip = payslips.find(p => p.id === payslipId);
+    console.log('Found payslip to delete:', payslip);
+    
+    if (!payslip) {
+      console.error('Payslip not found with ID:', payslipId);
+      showError('Payslip not found');
+      return;
+    }
+    
     showConfirm(
       'Delete Payslip',
       'Are you sure you want to delete this payslip? This action cannot be undone.',
       async () => {
         try {
+          console.log('Starting delete operation for payslip ID:', payslipId);
           showLoading('Deleting payslip...');
           
           // Delete from database service
           await syncDatabaseService.deletePayslip(payslipId);
+          console.log('Successfully deleted from database');
           
           // Immediately update local state to reflect the change
-          setPayslips(prevPayslips => prevPayslips.filter(p => p.id !== payslipId));
+          setPayslips(prevPayslips => {
+            const filtered = prevPayslips.filter(p => p.id !== payslipId);
+            console.log('Updated payslips after delete:', filtered);
+            return filtered;
+          });
           
           hideLoading();
           closeModal('confirm');
@@ -990,10 +1021,10 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {payslips.map((payslip, index) => {
+              {payslips.map((payslip) => {
                 const calculatedPayslip = calculatePayslip(payslip);
                 return (
-                  <tr key={index} className="hover:bg-gray-50 transition-colors">
+                  <tr key={payslip.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-3 py-2 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
