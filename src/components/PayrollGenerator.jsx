@@ -19,6 +19,11 @@ const [selectedEmployee, setSelectedEmployee] = useState(null);
 const [selectedEmployeeForPayslip, setSelectedEmployeeForPayslip] = useState('');
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+
+// Search functionality
+const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
+const [dataManagementEmployeeSearch, setDataManagementEmployeeSearch] = useState('');
+const [dataManagementPayslipSearch, setDataManagementPayslipSearch] = useState('');
 const [newEmployee, setNewEmployee] = useState({
     id: '',
     name: '',
@@ -591,6 +596,41 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     return result;
   };
 
+  // Search filtering functions
+  const filterPayslips = (payslips, searchQuery) => {
+    if (!searchQuery.trim()) {
+      return payslips;
+    }
+    
+    const query = searchQuery.toLowerCase().trim();
+    return payslips.filter(payslip => {
+      return (
+        payslip.name?.toLowerCase().includes(query) ||
+        payslip.id?.toLowerCase().includes(query) ||
+        payslip.employeeId?.toLowerCase().includes(query) ||
+        payslip.designation?.toLowerCase().includes(query) ||
+        payslip.department?.toLowerCase().includes(query)
+      );
+    });
+  };
+
+  const filterEmployees = (employees, searchQuery) => {
+    if (!searchQuery.trim()) {
+      return employees;
+    }
+    
+    const query = searchQuery.toLowerCase().trim();
+    return employees.filter(employee => {
+      return (
+        employee.name?.toLowerCase().includes(query) ||
+        employee.id?.toLowerCase().includes(query) ||
+        employee.designation?.toLowerCase().includes(query) ||
+        employee.department?.toLowerCase().includes(query) ||
+        employee.nrc?.toLowerCase().includes(query)
+      );
+    });
+  };
+
   const renderDashboard = () => (
     <div className="space-y-4 sm:space-y-6">
       {/* Pay Period Selector */}
@@ -698,38 +738,41 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       {/* Payslips Section */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="px-3 sm:px-4 py-3 border-b border-gray-200">
-          <div className="space-y-3 sm:space-y-0 sm:flex sm:justify-between sm:items-start">
+          <div className="space-y-3">
             <div>
               <h2 className="text-lg font-bold text-gray-900">Generated Payslips</h2>
               <p className="text-xs text-gray-600 mt-1">
-                {payrollData.payPeriod} • {payslips.length} payslip{payslips.length !== 1 ? 's' : ''}
+                {payrollData.payPeriod} • {filterPayslips(payslips, dashboardSearchQuery).length} payslip{filterPayslips(payslips, dashboardSearchQuery).length !== 1 ? 's' : ''}
               </p>
             </div>
-            <div className="flex flex-col xs:flex-row gap-2">
-              <div className="relative flex-1 xs:flex-initial">
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-full xs:w-40 pl-8 pr-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                />
-                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400" />
-                </div>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by name, ID, designation..."
+                value={dashboardSearchQuery}
+                onChange={(e) => setDashboardSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+              />
+              <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400" />
               </div>
+            </div>
+            <div className="flex flex-col xs:flex-row gap-2">
               <button
                 onClick={() => {
-                  if (payslips.length === 0) {
-                    showInfo('No payslips have been created yet. Please create some payslips first before exporting.', 'No Payslips to Export');
+                  const filteredPayslips = filterPayslips(payslips, dashboardSearchQuery);
+                  if (filteredPayslips.length === 0) {
+                    showInfo('No payslips found matching your search criteria. Please try a different search term or create some payslips first.', 'No Payslips Found');
                     return;
                   }
-                  // Generate and export all payslips as PDF
-                  const exportAllPayslips = () => {
+                  // Generate and export filtered payslips as PDF
+                  const exportFilteredPayslips = () => {
                     const printWindow = window.open('', '_blank');
                     let htmlContent = `
                       <!DOCTYPE html>
                       <html>
                       <head>
-                        <title>All Payslips - ${payrollData.payPeriod}</title>
+                        <title>Filtered Payslips - ${payrollData.payPeriod}</title>
                         <style>
                           @page {
                             size: A4;
@@ -879,7 +922,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                       <body>
                     `;
 
-                    payslips.forEach((payslip, index) => {
+                    filteredPayslips.forEach((payslip, index) => {
                       const calculatedPayslip = calculatePayslip(payslip);
                       htmlContent += `
                         <div class="payslip">
@@ -940,7 +983,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                           </div>
                           
                           <div class="footer">
-                            Generated on ${new Date().toLocaleDateString()} | Page ${index + 1} of ${payslips.length}
+                            Generated on ${new Date().toLocaleDateString()} | Page ${index + 1} of ${filteredPayslips.length}
                           </div>
                         </div>
                       `;
@@ -958,17 +1001,17 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                       printWindow.print();
                     }, 500);
                   };
-                  exportAllPayslips();
+                  exportFilteredPayslips();
                 }}
-                disabled={payslips.length === 0}
+                disabled={filterPayslips(payslips, dashboardSearchQuery).length === 0}
                 className={`px-3 py-2 rounded text-sm flex items-center gap-1 transition-colors min-h-touch ${
-                  payslips.length === 0 
+                  filterPayslips(payslips, dashboardSearchQuery).length === 0 
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                     : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
               >
                 <Download className="h-4 w-4" />
-                <span className="hidden xs:inline">Export All PDF</span>
+                <span className="hidden xs:inline">Export {dashboardSearchQuery ? 'Filtered ' : 'All '}PDF</span>
                 <span className="xs:hidden">Export</span>
               </button>
               <button
@@ -985,7 +1028,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         
         {/* Mobile Cards View (hidden on md and up) */}
         <div className="md:hidden">
-          {payslips.map((payslip) => {
+          {filterPayslips(payslips, dashboardSearchQuery).map((payslip) => {
             const calculatedPayslip = calculatePayslip(payslip);
             return (
               <div key={payslip.id} className="bg-white border-b border-gray-200 p-4">
@@ -1059,6 +1102,21 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </div>
             );
           })}
+          {filterPayslips(payslips, dashboardSearchQuery).length === 0 && payslips.length > 0 && dashboardSearchQuery && (
+            <div className="p-8 text-center">
+              <div className="flex flex-col items-center">
+                <Search className="h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-base font-medium text-gray-900 mb-2">No payslips found</h3>
+                <p className="text-sm text-gray-500 mb-4">No payslips match your search criteria "{dashboardSearchQuery}"</p>
+                <button
+                  onClick={() => setDashboardSearchQuery('')}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 min-h-touch"
+                >
+                  Clear Search
+                </button>
+              </div>
+            </div>
+          )}
           {payslips.length === 0 && (
             <div className="p-8 text-center">
               <div className="flex flex-col items-center">
@@ -1126,7 +1184,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {payslips.map((payslip) => {
+              {filterPayslips(payslips, dashboardSearchQuery).map((payslip) => {
                 const calculatedPayslip = calculatePayslip(payslip);
                 return (
                   <tr key={payslip.id} className="hover:bg-gray-50 transition-colors">
@@ -1198,6 +1256,23 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                   </tr>
                 );
               })}
+              {filterPayslips(payslips, dashboardSearchQuery).length === 0 && payslips.length > 0 && dashboardSearchQuery && (
+                <tr>
+                  <td colSpan="8" className="px-3 py-8 text-center">
+                    <div className="flex flex-col items-center">
+                      <Search className="h-10 w-10 text-gray-400 mb-3" />
+                      <h3 className="text-sm font-medium text-gray-900 mb-1">No payslips found</h3>
+                      <p className="text-xs text-gray-500 mb-3">No payslips match your search criteria "{dashboardSearchQuery}"</p>
+                      <button
+                        onClick={() => setDashboardSearchQuery('')}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        Clear Search
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
               {payslips.length === 0 && (
                 <tr>
                   <td colSpan="8" className="px-3 py-8 text-center">
@@ -1223,27 +1298,31 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         </div>
 
         {/* Table Footer with Summary */}
-        {payslips.length > 0 && (
+        {filterPayslips(payslips, dashboardSearchQuery).length > 0 && (
           <div className="px-3 sm:px-4 py-3 border-t border-gray-200 bg-gray-50">
             <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center text-xs">
               <div className="text-gray-600">
-                {payslips.length} payslip{payslips.length !== 1 ? 's' : ''} • {payrollData.payPeriod}
+                {dashboardSearchQuery && filterPayslips(payslips, dashboardSearchQuery).length !== payslips.length ? (
+                  <span>{filterPayslips(payslips, dashboardSearchQuery).length} of {payslips.length} payslip{payslips.length !== 1 ? 's' : ''} • {payrollData.payPeriod}</span>
+                ) : (
+                  <span>{filterPayslips(payslips, dashboardSearchQuery).length} payslip{filterPayslips(payslips, dashboardSearchQuery).length !== 1 ? 's' : ''} • {payrollData.payPeriod}</span>
+                )}
               </div>
               <div className="flex flex-col xs:flex-row xs:items-center gap-2 xs:gap-4 text-gray-600">
                 <span>Total: <span className="font-semibold text-gray-900">
-                  {payslips.reduce((sum, payslip) => {
+                  {filterPayslips(payslips, dashboardSearchQuery).reduce((sum, payslip) => {
                     const calculatedPayslip = calculatePayslip(payslip);
                     return sum + calculatedPayslip.totalEarnings;
                   }, 0).toFixed(0)}
                 </span></span>
                 <span>Deductions: <span className="font-semibold text-red-600">
-                  {payslips.reduce((sum, payslip) => {
+                  {filterPayslips(payslips, dashboardSearchQuery).reduce((sum, payslip) => {
                     const calculatedPayslip = calculatePayslip(payslip);
                     return sum + calculatedPayslip.totalDeductions;
                   }, 0).toFixed(0)}
                 </span></span>
                 <span>Net: <span className="font-semibold text-green-600">
-                  {payslips.reduce((sum, payslip) => {
+                  {filterPayslips(payslips, dashboardSearchQuery).reduce((sum, payslip) => {
                     const calculatedPayslip = calculatePayslip(payslip);
                     return sum + calculatedPayslip.netPay;
                   }, 0).toFixed(0)}
@@ -2736,7 +2815,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {employeeDatabase.map((employee) => (
+                {filterEmployees(employeeDatabase, dataManagementEmployeeSearch).map((employee) => (
                   <tr key={employee.id} className="border-b border-gray-200 hover:bg-gray-50">
                     <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{employee.id}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{employee.name}</td>
@@ -2753,6 +2832,22 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     </td>
                   </tr>
                 ))}
+                {filterEmployees(employeeDatabase, dataManagementEmployeeSearch).length === 0 && employeeDatabase.length > 0 && dataManagementEmployeeSearch && (
+                  <tr>
+                    <td colSpan="5" className="px-3 py-8 text-center text-gray-500">
+                      <div className="flex flex-col items-center">
+                        <Search className="h-8 w-8 text-gray-400 mb-2" />
+                        <p>No employees found matching "{dataManagementEmployeeSearch}"</p>
+                        <button
+                          onClick={() => setDataManagementEmployeeSearch('')}
+                          className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          Clear search
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
                 {employeeDatabase.length === 0 && (
                   <tr>
                     <td colSpan="5" className="px-3 py-8 text-center text-gray-500">
@@ -2853,28 +2948,101 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Search Employees</label>
-              <input
-                type="text"
-                placeholder="Search by name, ID, designation, or department..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                onChange={(e) => {
-                  const results = syncDatabaseService.searchEmployees(e.target.value);
-                  console.log('Employee search results:', results);
-                }}
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by name, ID, designation, or department..."
+                  value={dataManagementEmployeeSearch}
+                  onChange={(e) => setDataManagementEmployeeSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-gray-400" />
+                </div>
+              </div>
+              {dataManagementEmployeeSearch && (
+                <div className="mt-2 text-sm text-gray-600">
+                  Found {filterEmployees(employeeDatabase, dataManagementEmployeeSearch).length} of {employeeDatabase.length} employees
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Search Payslips</label>
-              <input
-                type="text"
-                placeholder="Search by employee name, ID, or pay period..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                onChange={(e) => {
-                  const results = syncDatabaseService.searchPayslips(e.target.value);
-                  console.log('Payslip search results:', results);
-                }}
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by employee name, ID, or pay period..."
+                  value={dataManagementPayslipSearch}
+                  onChange={(e) => setDataManagementPayslipSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-gray-400" />
+                </div>
+              </div>
+              {dataManagementPayslipSearch && (
+                <div className="mt-2 text-sm text-gray-600">
+                  Found {filterPayslips(payslips, dataManagementPayslipSearch).length} of {payslips.length} payslips
+                </div>
+              )}
             </div>
+            
+            {/* Show search results */}
+            {(dataManagementEmployeeSearch || dataManagementPayslipSearch) && (
+              <div className="pt-4 border-t border-gray-200">
+                <h4 className="text-md font-medium text-gray-800 mb-3">Search Results</h4>
+                
+                {dataManagementEmployeeSearch && (
+                  <div className="mb-4">
+                    <h5 className="text-sm font-medium text-gray-700 mb-2">
+                      Employees ({filterEmployees(employeeDatabase, dataManagementEmployeeSearch).length})
+                    </h5>
+                    {filterEmployees(employeeDatabase, dataManagementEmployeeSearch).length > 0 ? (
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {filterEmployees(employeeDatabase, dataManagementEmployeeSearch).slice(0, 5).map((employee) => (
+                          <div key={employee.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                            <span className="font-medium">{employee.name}</span>
+                            <span className="text-gray-500">{employee.id} • {employee.designation}</span>
+                          </div>
+                        ))}
+                        {filterEmployees(employeeDatabase, dataManagementEmployeeSearch).length > 5 && (
+                          <div className="text-xs text-gray-500 text-center pt-1">
+                            ...and {filterEmployees(employeeDatabase, dataManagementEmployeeSearch).length - 5} more
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">No employees found</p>
+                    )}
+                  </div>
+                )}
+                
+                {dataManagementPayslipSearch && (
+                  <div>
+                    <h5 className="text-sm font-medium text-gray-700 mb-2">
+                      Payslips ({filterPayslips(payslips, dataManagementPayslipSearch).length})
+                    </h5>
+                    {filterPayslips(payslips, dataManagementPayslipSearch).length > 0 ? (
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {filterPayslips(payslips, dataManagementPayslipSearch).slice(0, 5).map((payslip) => (
+                          <div key={payslip.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                            <span className="font-medium">{payslip.name}</span>
+                            <span className="text-gray-500">{payslip.payPeriod || payslip.payrollPeriod} • {payslip.designation}</span>
+                          </div>
+                        ))}
+                        {filterPayslips(payslips, dataManagementPayslipSearch).length > 5 && (
+                          <div className="text-xs text-gray-500 text-center pt-1">
+                            ...and {filterPayslips(payslips, dataManagementPayslipSearch).length - 5} more
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">No payslips found</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
