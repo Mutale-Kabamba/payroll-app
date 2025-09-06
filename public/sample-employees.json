@@ -1,0 +1,102 @@
+{
+  "employees": [
+    {
+      "id": "LEW001",
+      "name": "LESA LEWIS",
+      "nrc": "217589/68/1",
+      "ssn": "911834888",
+      "gender": "Male",
+      "designation": "DRIVER",
+      "dateOfJoining": "1973-05-12",
+      "basicPay": 3000.00,
+      "transportAllowance": 0.00,
+      "mealAllowance": 0.00,
+      "department": "OPERATIONS & LOGISTICS",
+      "address": "C153 Linda - Livingstone"
+    },
+    {
+      "id": "WIN002",
+      "name": "KASENGA WINTER",
+      "nrc": "633347/11/1",
+      "ssn": "208975378",
+      "gender": "Male",
+      "designation": "DRIVER",
+      "dateOfJoining": "1976-05-20",
+      "basicPay": 3000.00,
+      "transportAllowance": 0.00,
+      "mealAllowance": 0.00,
+      "department": "OPERATIONS & LOGISTICS",
+      "address": "121 Dambwa North - Livingstone"
+    },
+    {
+      "id": "HAR003",
+      "name": "NDHLOVU HARRISON",
+      "nrc": "231690/7/1",
+      "ssn": "905369104",
+      "gender": "Male",
+      "designation": "GENERAL WORKER",
+      "dateOfJoining": "1986-05-03",
+      "basicPay": 1500.00,
+      "transportAllowance": 0.00,
+      "mealAllowance": 0.00,
+      "department": "OPERATIONS & LOGISTICS",
+      "address": "C31 Linda - Livingstone"
+    },
+    {
+      "id": "CHI004",
+      "name": "KANTEMBA CHIMUNYA ISAAC",
+      "nrc": "328165/71/1",
+      "ssn": "941778636",
+      "gender": "Male",
+      "designation": "GENERAL WORKER",
+      "dateOfJoining": "1993-10-12",
+      "basicPay": 1500.00,
+      "transportAllowance": 0.00,
+      "mealAllowance": 0.00,
+      "department": "OPERATIONS & LOGISTICS",
+      "address": "C75 Dambwa South - Livingstone"
+    },
+    {
+      "id": "ABR005",
+      "name": "KANG'OTI BYEMBA ABRAHAM",
+      "nrc": "198290/84/1",
+      "ssn": "",
+      "gender": "Male",
+      "designation": "GENERAL WORKER",
+      "dateOfJoining": "1969-08-18",
+      "basicPay": 700.00,
+      "transportAllowance": 0.00,
+      "mealAllowance": 0.00,
+      "department": "OPERATIONS & LOGISTICS",
+      "address": "2670 Senanga Rd - Livingstone"
+    },
+    {
+      "id": "KAB006",
+      "name": "MUTALE KABAMBA",
+      "nrc": "317029/68/1",
+      "ssn": "820434124",
+      "gender": "Male",
+      "designation": "MANAGER",
+      "dateOfJoining": "1998-04-03",
+      "basicPay": 4000.00,
+      "transportAllowance": 0.00,
+      "mealAllowance": 0.00,
+      "department": "IT & ACCOUNTS",
+      "address": "10A Off Natwange Road - Livingstone"
+    },
+    {
+      "id": "DAN007",
+      "name": "MWANAMWALE M. DANIEL",
+      "nrc": "216487/71/1",
+      "ssn": "912775251",
+      "gender": "Male",
+      "designation": "DRIVER",
+      "dateOfJoining": "",
+      "basicPay": 1500.00,
+      "transportAllowance": 0.00,
+      "mealAllowance": 0.00,
+      "department": "OPERATIONS & LOGISTICS",
+      "address": ""
+    }
+  ]
+}

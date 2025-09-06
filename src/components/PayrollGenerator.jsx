@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Download, Calculator, Users, FileText, Menu, X, BarChart3, TrendingUp, DollarSign, Calendar, LogOut, User, Wifi, WifiOff, Cloud, CloudOff } from 'lucide-react';
+import { Plus, Edit2, Trash2, Download, Calculator, Users, FileText, Menu, X, BarChart3, TrendingUp, DollarSign, Calendar, LogOut, User, Wifi, WifiOff, Cloud, CloudOff, Search, Upload, Check, AlertCircle, PlusCircle, Database, Settings, HelpCircle, Eye } from 'lucide-react';
 import syncDatabaseService from '../services/SyncDatabaseService';
 import { SuccessModal, ErrorModal, ConfirmModal, InfoModal } from './Modal';
 import LoadingModal from './LoadingModal';
@@ -18,6 +18,23 @@ const [currentView, setCurrentView] = useState('dashboard');
 const [selectedEmployee, setSelectedEmployee] = useState(null);
 const [selectedEmployeeForPayslip, setSelectedEmployeeForPayslip] = useState('');
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+const [newEmployee, setNewEmployee] = useState({
+    id: '',
+    name: '',
+    nrc: '',
+    ssn: '',
+    gender: 'Male',
+    designation: '',
+    dateOfJoining: '',
+    basicPay: '',
+    transportAllowance: '',
+    mealAllowance: '',
+    address: '',
+    department: '',
+    napsa: '',
+    nhima: ''
+});
 const [payrollData, setPayrollData] = useState({
     payPeriod: 'August 2024',
     workedDays: 26,
@@ -100,6 +117,238 @@ const payPeriodOptions = [
     'January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025',
     'July 2025', 'August 2025', 'September 2025', 'October 2025', 'November 2025', 'December 2025'
 ];
+
+// Employee Management Functions
+const handleAddEmployee = async () => {
+    if (!newEmployee.id.trim()) {
+        showError('Employee ID is required', 'Validation Error');
+        return;
+    }
+    
+    if (!newEmployee.name.trim()) {
+        showError('Employee name is required', 'Validation Error');
+        return;
+    }
+
+    if (!newEmployee.designation.trim()) {
+        showError('Employee designation is required', 'Validation Error');
+        return;
+    }
+
+    try {
+        // Check if employee ID already exists
+        const existingEmployee = employeeDatabase.find(emp => emp.id === newEmployee.id);
+        if (existingEmployee) {
+            showError(`Employee with ID ${newEmployee.id} already exists`, 'Duplicate ID');
+            return;
+        }
+
+        // Prepare employee data
+        const employeeData = {
+            ...newEmployee,
+            basicPay: parseFloat(newEmployee.basicPay) || 0,
+            transportAllowance: parseFloat(newEmployee.transportAllowance) || 0,
+            mealAllowance: parseFloat(newEmployee.mealAllowance) || 0,
+            createdAt: new Date().toISOString()
+        };
+
+        showLoading('Adding employee...');
+
+        // Add employee to database
+        await syncDatabaseService.addEmployee(employeeData);
+        
+        // Update local state
+        const updatedEmployees = await syncDatabaseService.getEmployees();
+        setEmployeeDatabase(updatedEmployees);
+        
+        // Reset form
+        setNewEmployee({
+            id: '',
+            name: '',
+            nrc: '',
+            ssn: '',
+            gender: 'Male',
+            designation: '',
+            dateOfJoining: '',
+            basicPay: '',
+            transportAllowance: '',
+            mealAllowance: '',
+            address: '',
+            department: '',
+            napsa: '',
+            nhima: ''
+        });
+        
+        setShowEmployeeForm(false);
+        hideLoading();
+        showSuccess(`Employee ${employeeData.name} has been added successfully!`, 'Employee Added');
+    } catch (error) {
+        hideLoading();
+        console.error('Error adding employee:', error);
+        showError(error.message || 'Failed to add employee', 'Add Employee Failed');
+    }
+};
+
+const handleDeleteEmployee = async (employeeId) => {
+    const employee = employeeDatabase.find(emp => emp.id === employeeId);
+    if (!employee) {
+        return;
+    }
+    
+    showConfirm(
+        `Are you sure you want to delete employee ${employee.name} (${employee.id})? This action cannot be undone.`,
+        async () => {
+            try {
+                showLoading('Deleting employee...');
+                await syncDatabaseService.deleteEmployee(employeeId);
+                
+                // Update local state
+                const updatedEmployees = await syncDatabaseService.getEmployees();
+                setEmployeeDatabase(updatedEmployees);
+                
+                hideLoading();
+                showSuccess(`Employee ${employee.name} has been deleted successfully.`, 'Employee Deleted');
+                closeModal('confirm');
+            } catch (error) {
+                hideLoading();
+                console.error('Error deleting employee:', error);
+                showError(error.message || 'Failed to delete employee', 'Delete Employee Failed');
+                closeModal('confirm');
+            }
+        },
+        {
+            title: 'Delete Employee',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            danger: true
+        }
+    );
+};
+
+const handleBulkImportEmployees = async (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            
+            // Validate the JSON structure
+            if (!data.employees || !Array.isArray(data.employees)) {
+                showError('Invalid file format. Please ensure the JSON file has an "employees" array.', 'Invalid Format');
+                return;
+            }
+
+            // Validate each employee object
+            const requiredFields = ['id', 'name', 'designation'];
+            const invalidEmployees = data.employees.filter(emp => 
+                !requiredFields.every(field => emp[field] && emp[field].toString().trim())
+            );
+
+            if (invalidEmployees.length > 0) {
+                showError(`Found ${invalidEmployees.length} employees with missing required fields (ID, Name, Designation). Please check your file.`, 'Validation Error');
+                return;
+            }
+
+            // Check for duplicate IDs in the import file
+            const ids = data.employees.map(emp => emp.id);
+            const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+            if (duplicateIds.length > 0) {
+                showError(`Duplicate employee IDs found in import file: ${duplicateIds.join(', ')}. Please fix these duplicates.`, 'Duplicate IDs');
+                return;
+            }
+
+            // Check for conflicts with existing employees
+            const existingIds = employeeDatabase.map(emp => emp.id);
+            const conflictingIds = data.employees.filter(emp => existingIds.includes(emp.id)).map(emp => emp.id);
+            
+            const confirmMessage = conflictingIds.length > 0 
+                ? `This will import ${data.employees.length} employees. ${conflictingIds.length} employees have IDs that already exist and will be updated: ${conflictingIds.join(', ')}. Do you want to continue?`
+                : `This will import ${data.employees.length} new employees. Do you want to continue?`;
+
+            showConfirm(
+                confirmMessage,
+                async () => {
+                    try {
+                        showLoading(`Importing ${data.employees.length} employees...`);
+                        
+                        let successCount = 0;
+                        let errorCount = 0;
+                        const errors = [];
+
+                        for (const employeeData of data.employees) {
+                            try {
+                                // Ensure all required fields are present and valid
+                                const processedEmployee = {
+                                    id: employeeData.id.toString().trim(),
+                                    name: employeeData.name.toString().trim(),
+                                    nrc: employeeData.nrc ? employeeData.nrc.toString().trim() : '',
+                                    ssn: employeeData.ssn ? employeeData.ssn.toString().trim() : '',
+                                    gender: employeeData.gender || 'Male',
+                                    designation: employeeData.designation.toString().trim(),
+                                    dateOfJoining: employeeData.dateOfJoining || new Date().toISOString().split('T')[0],
+                                    basicPay: parseFloat(employeeData.basicPay) || 0,
+                                    transportAllowance: parseFloat(employeeData.transportAllowance) || 0,
+                                    mealAllowance: parseFloat(employeeData.mealAllowance) || 0,
+                                    department: employeeData.department ? employeeData.department.toString().trim() : '',
+                                    address: employeeData.address ? employeeData.address.toString().trim() : '',
+                                    createdAt: new Date().toISOString()
+                                };
+
+                                await syncDatabaseService.addEmployee(processedEmployee);
+                                successCount++;
+                            } catch (error) {
+                                errorCount++;
+                                errors.push(`${employeeData.id}: ${error.message}`);
+                                console.error(`Error importing employee ${employeeData.id}:`, error);
+                            }
+                        }
+
+                        // Refresh the employee list
+                        const updatedEmployees = await syncDatabaseService.getEmployees();
+                        setEmployeeDatabase(updatedEmployees);
+
+                        hideLoading();
+                        closeModal('confirm');
+
+                        // Show comprehensive result message
+                        if (errorCount === 0) {
+                            showSuccess(`Successfully imported all ${successCount} employees!`, 'Bulk Import Complete');
+                        } else if (successCount > 0) {
+                            showInfo(`Import completed with mixed results:\n✅ ${successCount} employees imported successfully\n❌ ${errorCount} employees failed\n\nErrors:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...and more' : ''}`, 'Import Results');
+                        } else {
+                            showError(`Failed to import any employees. Errors:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...and more' : ''}`, 'Import Failed');
+                        }
+
+                    } catch (error) {
+                        hideLoading();
+                        closeModal('confirm');
+                        console.error('Error during bulk import:', error);
+                        showError(`Bulk import failed: ${error.message}`, 'Import Error');
+                    }
+                },
+                {
+                    title: 'Confirm Bulk Import',
+                    confirmText: 'Import Employees',
+                    cancelText: 'Cancel',
+                    danger: false
+                }
+            );
+
+        } catch (error) {
+            console.error('Error parsing employee file:', error);
+            showError('The selected file is not a valid JSON file. Please check the file format and try again.', 'Invalid File');
+        }
+    };
+
+    reader.readAsText(file);
+    
+    // Reset the file input
+    event.target.value = '';
+};
 
   const [newPayslip, setNewPayslip] = useState({
     employeeId: '',
@@ -2490,6 +2739,239 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     return (
       <div className="space-y-6">
         <h2 className="text-xl font-bold text-gray-900 mb-6">Data Management</h2>
+        
+        {/* Employee Management */}
+        <div className="bg-white p-6 rounded border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+              <Users className="mr-2 text-blue-600" />
+              Employee Management
+            </h3>
+            <div className="flex gap-3">
+              <label className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors flex items-center gap-2 cursor-pointer">
+                <Upload className="h-4 w-4" />
+                Bulk Import
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleBulkImportEmployees}
+                  className="hidden"
+                />
+              </label>
+              <button
+                onClick={() => setShowEmployeeForm(!showEmployeeForm)}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                {showEmployeeForm ? 'Cancel' : 'Add Employee'}
+              </button>
+            </div>
+          </div>
+
+          {/* Add Employee Form */}
+          {showEmployeeForm && (
+            <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
+              <h4 className="font-semibold text-gray-800 mb-4">Add New Employee</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID *</label>
+                  <input
+                    type="text"
+                    value={newEmployee.id}
+                    onChange={(e) => setNewEmployee({...newEmployee, id: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., EMP001"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    value={newEmployee.name}
+                    onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Employee full name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">NRC</label>
+                  <input
+                    type="text"
+                    value={newEmployee.nrc}
+                    onChange={(e) => setNewEmployee({...newEmployee, nrc: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="National Registration Card"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SSN</label>
+                  <input
+                    type="text"
+                    value={newEmployee.ssn}
+                    onChange={(e) => setNewEmployee({...newEmployee, ssn: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Social Security Number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                  <select
+                    value={newEmployee.gender}
+                    onChange={(e) => setNewEmployee({...newEmployee, gender: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Designation *</label>
+                  <input
+                    type="text"
+                    value={newEmployee.designation}
+                    onChange={(e) => setNewEmployee({...newEmployee, designation: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Job title/position"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date of Joining</label>
+                  <input
+                    type="date"
+                    value={newEmployee.dateOfJoining}
+                    onChange={(e) => setNewEmployee({...newEmployee, dateOfJoining: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Basic Pay (ZMW)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newEmployee.basicPay}
+                    onChange={(e) => setNewEmployee({...newEmployee, basicPay: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Transport Allowance (ZMW)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newEmployee.transportAllowance}
+                    onChange={(e) => setNewEmployee({...newEmployee, transportAllowance: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Meal Allowance (ZMW)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newEmployee.mealAllowance}
+                    onChange={(e) => setNewEmployee({...newEmployee, mealAllowance: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <input
+                    type="text"
+                    value={newEmployee.department}
+                    onChange={(e) => setNewEmployee({...newEmployee, department: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Department name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                  <input
+                    type="text"
+                    value={newEmployee.address}
+                    onChange={(e) => setNewEmployee({...newEmployee, address: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Employee address"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowEmployeeForm(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddEmployee}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Add Employee
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Bulk Import Information */}
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <div className="flex items-start">
+              <Database className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="text-sm text-blue-800">
+                <strong>Bulk Import:</strong> Upload a JSON file to add multiple employees at once. 
+                <a 
+                  href="/sample-employees.json" 
+                  download="sample-employees.json"
+                  className="ml-1 underline hover:text-blue-900"
+                >
+                  Download sample file
+                </a> to see the required format.
+              </div>
+            </div>
+          </div>
+
+          {/* Employee List */}
+          <div className="overflow-x-auto">
+            <table className="w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Designation</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Basic Pay</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {employeeDatabase.map((employee) => (
+                  <tr key={employee.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{employee.id}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{employee.name}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{employee.designation}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">ZMW {employee.basicPay.toFixed(2)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm">
+                      <button
+                        onClick={() => handleDeleteEmployee(employee.id)}
+                        className="text-red-600 hover:text-red-900 transition-colors"
+                        title="Delete Employee"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {employeeDatabase.length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="px-3 py-8 text-center text-gray-500">
+                      No employees found. Add your first employee to get started.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
         
         {/* Storage Information */}
         <div className="bg-white p-6 rounded border border-gray-200 shadow-sm">
