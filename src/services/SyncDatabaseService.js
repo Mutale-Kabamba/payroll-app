@@ -103,18 +103,26 @@ class SyncDatabaseService {
             }
             return localEmployees;
           } else {
-            // Both cloud and local are empty, let local service initialize defaults
-            this.localService.initializeDatabase();
-            const initializedEmployees = this.localService.getEmployees();
-            // Try to sync initialized data to cloud
-            try {
-              for (const employee of initializedEmployees) {
-                await this.cloudService.addEmployee(employee);
+            // Both cloud and local are empty - check if user has deliberately deleted all employees
+            const hasBeenInitialized = localStorage.getItem('payroll_app_initialized');
+            if (!hasBeenInitialized) {
+              // First time setup - initialize with defaults
+              this.localService.initializeDatabase();
+              const initializedEmployees = this.localService.getEmployees();
+              // Try to sync initialized data to cloud
+              try {
+                for (const employee of initializedEmployees) {
+                  await this.cloudService.addEmployee(employee);
+                }
+              } catch (syncError) {
+                console.log('Failed to sync initialized employees to cloud:', syncError);
               }
-            } catch (syncError) {
-              console.log('Failed to sync initialized employees to cloud:', syncError);
+              return initializedEmployees;
+            } else {
+              // User has previously used the system and deliberately deleted all employees
+              // Respect their choice and return empty array
+              return [];
             }
-            return initializedEmployees;
           }
         } catch (cloudError) {
           console.error('Cloud service error, falling back to local:', cloudError);
@@ -402,6 +410,9 @@ class SyncDatabaseService {
     try {
       // Clear local data
       this.localService.clearAllData();
+      
+      // Clear the initialization flag so user can get defaults again if needed
+      localStorage.removeItem('payroll_app_initialized');
       
       if (this.isOnline) {
         // Note: Clearing cloud data would require implementing batch delete
