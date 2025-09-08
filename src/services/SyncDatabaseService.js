@@ -222,16 +222,22 @@ class SyncDatabaseService {
 
   async deleteEmployee(employeeId) {
     try {
+      console.log(`SyncDatabaseService: Deleting employee ${employeeId}`);
+      
       // Always delete locally first
       this.localService.deleteEmployee(employeeId);
+      console.log(`Local deletion successful for employee ${employeeId}`);
       
       if (this.isOnline) {
         try {
           await this.cloudService.deleteEmployee(employeeId);
+          console.log(`Cloud deletion successful for employee ${employeeId}`);
         } catch (cloudError) {
+          console.error(`Cloud deletion failed for employee ${employeeId}, adding to sync queue:`, cloudError);
           this.addToSyncQueue('deleteEmployee', { id: employeeId });
         }
       } else {
+        console.log(`Offline: Adding employee ${employeeId} deletion to sync queue`);
         this.addToSyncQueue('deleteEmployee', { id: employeeId });
       }
       
@@ -283,16 +289,22 @@ class SyncDatabaseService {
 
   async deletePayslip(payslipId) {
     try {
+      console.log(`SyncDatabaseService: Deleting payslip ${payslipId}`);
+      
       // Always delete locally first
       this.localService.deletePayslip(payslipId);
+      console.log(`Local deletion successful for payslip ${payslipId}`);
       
       if (this.isOnline) {
         try {
           await this.cloudService.deletePayslip(payslipId);
+          console.log(`Cloud deletion successful for payslip ${payslipId}`);
         } catch (cloudError) {
+          console.error(`Cloud deletion failed for payslip ${payslipId}, adding to sync queue:`, cloudError);
           this.addToSyncQueue('deletePayslip', { id: payslipId });
         }
       } else {
+        console.log(`Offline: Adding payslip ${payslipId} deletion to sync queue`);
         this.addToSyncQueue('deletePayslip', { id: payslipId });
       }
       
