@@ -16,7 +16,6 @@ const [payslips, setPayslips] = useState([]);
 
 const [currentView, setCurrentView] = useState('dashboard');
 const [selectedEmployee, setSelectedEmployee] = useState(null);
-const [selectedEmployeeForPayslip, setSelectedEmployeeForPayslip] = useState('');
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 const [showEmployeeForm, setShowEmployeeForm] = useState(false);
 const [editingEmployee, setEditingEmployee] = useState(null);
@@ -73,6 +72,9 @@ useEffect(() => {
                 workedDays: settings.workedDays || prevData.workedDays,
                 totalDays: settings.totalDays || prevData.totalDays
             }));
+            
+            // Initialize sync after data is loaded
+            await syncDatabaseService.initializeSync();
             
             setSyncStatus('synced');
         } catch (error) {
@@ -445,6 +447,45 @@ const handleBulkImportEmployees = async (event) => {
     event.target.value = '';
   };
 
+  // Function to restore default employees
+  const handleRestoreDefaultEmployees = async () => {
+    showConfirm(
+      'This will add 7 default sample employees to your database. Existing employees will not be affected.',
+      'Restore Default Employees?',
+      async () => {
+        try {
+          showLoading('Restoring default employees...');
+          
+          // Temporarily allow initialization of defaults
+          localStorage.removeItem('payroll_app_deliberately_cleared');
+          
+          // Initialize with default employees
+          syncDatabaseService.localService.initializeDefaultEmployees();
+          
+          // Refresh the employee list
+          const updatedEmployees = await syncDatabaseService.getEmployees();
+          setEmployeeDatabase(updatedEmployees);
+          
+          hideLoading();
+          closeModal('confirm');
+          showSuccess('Default employees have been successfully added to your database.', 'Employees Restored');
+          
+        } catch (error) {
+          hideLoading();
+          closeModal('confirm');
+          console.error('Error restoring default employees:', error);
+          showError(`Failed to restore default employees: ${error.message}`, 'Restore Failed');
+        }
+      },
+      {
+        title: 'Restore Default Employees',
+        confirmText: 'Restore Employees',
+        cancelText: 'Cancel',
+        danger: false
+      }
+    );
+  };
+
   const [newPayslip, setNewPayslip] = useState({
     employeeId: '',
     otherEarnings: [],
@@ -480,13 +521,14 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
   };
 
   const addPayslip = async () => {
-    if (!selectedEmployeeForPayslip) {
+    if (!newPayslip.employeeId) {
       showError('Please select an employee');
       return;
     }
 
     try {
-      const employee = employeeDatabase.find(emp => emp.id === selectedEmployeeForPayslip);
+      const employee = employeeDatabase.find(emp => emp.id === newPayslip.employeeId);
+      
       if (!employee) {
         showError('Selected employee not found');
         return;
@@ -496,13 +538,14 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
       // Generate payslip with proper ID and flatten employee data for easier access
       const payslipId = `PS_${employee.id}_${Date.now()}`;
-      const newPayslip = {
+      const payslipData = {
         id: payslipId,
         // Employee info flattened for easier access in table
         employeeId: employee.id,
         name: employee.name,
         designation: employee.designation,
         nrc: employee.nrc,
+        ssn: employee.ssn || '', // Handle empty SSN
         // Payroll data
         payPeriod: payrollData.payPeriod,
         workedDays: payrollData.workedDays,
@@ -515,13 +558,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         // Keep full employee object for backward compatibility
         employee: employee,
         createdAt: new Date().toISOString(),
-        // Initialize other earnings and deductions as empty arrays
-        otherEarnings: [],
-        otherDeductions: []
+        // Include other earnings and deductions from the form
+        otherEarnings: newPayslip.otherEarnings || [],
+        otherDeductions: newPayslip.otherDeductions || []
       };
 
       // Save to database
-      await syncDatabaseService.addPayslip(newPayslip);
+      await syncDatabaseService.addPayslip(payslipData);
       
       // Update local state
       const updatedPayslips = await syncDatabaseService.getPayslips();
@@ -529,11 +572,15 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
       hideLoading();
       showSuccess(`Payslip generated successfully for ${employee.name}!`);
-      setSelectedEmployeeForPayslip('');
+      setNewPayslip({
+        employeeId: '',
+        otherEarnings: [],
+        otherDeductions: []
+      });
     } catch (error) {
       console.error('Error generating payslip:', error);
       hideLoading();
-      showError('Failed to generate payslip');
+      showError(`Failed to generate payslip: ${error.message}`);
     }
   };
 
@@ -2661,13 +2708,16 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               try {
                 await syncDatabaseService.clearAllData();
                 
-                // Reset to initial state
-                syncDatabaseService.initializeDatabase();
-                setEmployeeDatabase(await syncDatabaseService.getEmployees());
-                setPayslips(await syncDatabaseService.getPayslips());
-                setPayrollData(await syncDatabaseService.getPayrollSettings());
+                // Reset to empty state (don't reinitialize with defaults)
+                setEmployeeDatabase([]);
+                setPayslips([]);
+                setPayrollData({
+                  payPeriod: 'September 2025',
+                  workedDays: 22,
+                  totalDays: 22
+                });
                 
-                showSuccess('All data has been cleared successfully. The system has been reset to its default state.', 'Data Cleared');
+                showSuccess('All data has been cleared successfully. The system has been reset to an empty state.', 'Data Cleared');
                 closeModal('confirm');
               } catch (error) {
                 console.error('Error clearing data:', error);
@@ -2707,6 +2757,14 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               Employee Management
             </h3>
             <div className="flex gap-3">
+              <button
+                onClick={handleRestoreDefaultEmployees}
+                className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors flex items-center gap-2"
+                title="Restore 7 sample employees"
+              >
+                <Users className="h-4 w-4" />
+                Restore Defaults
+              </button>
               <label className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors flex items-center gap-2 cursor-pointer">
                 <Upload className="h-4 w-4" />
                 Bulk Import
