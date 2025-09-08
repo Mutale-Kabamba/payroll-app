@@ -252,15 +252,61 @@ class SyncDatabaseService {
   async getPayslips() {
     try {
       if (this.isOnline) {
-        const cloudPayslips = await this.cloudService.getPayslips();
-        // Update local storage with cloud data
-        this.localService.setPayslips(cloudPayslips);
-        return cloudPayslips;
+        try {
+          const cloudPayslips = await this.cloudService.getPayslips();
+          const localPayslips = this.localService.getPayslips();
+          
+          console.log(`Found ${cloudPayslips.length} payslips in cloud, ${localPayslips.length} locally`);
+          
+          if (cloudPayslips.length > 0) {
+            // Use cloud data as the source of truth, but don't overwrite if local has more recent data
+            this.localService.setPayslips(cloudPayslips);
+            return cloudPayslips;
+          } else if (localPayslips.length > 0) {
+            // Cloud is empty but local has data, sync local to cloud
+            console.log('Cloud is empty, syncing local payslips to cloud');
+            try {
+              for (const payslip of localPayslips) {
+                await this.cloudService.addPayslip(payslip);
+              }
+            } catch (syncError) {
+              console.log('Failed to sync local payslips to cloud:', syncError);
+            }
+            return localPayslips;
+          } else {
+            // Both are empty
+            return [];
+          }
+        } catch (cloudError) {
+          console.error('Cloud service error for payslips, falling back to local:', cloudError);
+          return this.localService.getPayslips();
+        }
       } else {
         return this.localService.getPayslips();
       }
     } catch (error) {
       console.error('Error getting payslips, falling back to local:', error);
+      return this.localService.getPayslips();
+    }
+  }
+
+  // Force refresh payslips from cloud (useful after deletions)
+  async refreshPayslipsFromCloud() {
+    try {
+      if (this.isOnline) {
+        console.log('Force refreshing payslips from cloud...');
+        const cloudPayslips = await this.cloudService.getPayslips();
+        console.log(`Fetched ${cloudPayslips.length} payslips from cloud`);
+        
+        // Update local storage with cloud data
+        this.localService.setPayslips(cloudPayslips);
+        return cloudPayslips;
+      } else {
+        console.log('Offline: Cannot refresh from cloud, returning local payslips');
+        return this.localService.getPayslips();
+      }
+    } catch (error) {
+      console.error('Error refreshing payslips from cloud:', error);
       return this.localService.getPayslips();
     }
   }

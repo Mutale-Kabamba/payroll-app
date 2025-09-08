@@ -411,16 +411,43 @@ class CloudDatabaseService {
   // SYNC METHODS
   async syncLocalToCloud() {
     try {
+      console.log('Starting sync from local to cloud...');
+      
       // Sync employees
       const localEmployees = this.getLocalEmployees();
+      console.log(`Syncing ${localEmployees.length} employees to cloud`);
       for (const employee of localEmployees) {
-        await this.addEmployee(employee);
+        try {
+          await this.addEmployee(employee);
+        } catch (error) {
+          console.log(`Failed to sync employee ${employee.id}:`, error.message);
+        }
       }
 
-      // Sync payslips
+      // Sync payslips - but first check what's already in cloud to avoid duplicates
       const localPayslips = this.getLocalPayslips();
+      console.log(`Syncing ${localPayslips.length} payslips to cloud`);
+      
+      let cloudPayslips = [];
+      try {
+        cloudPayslips = await this.getPayslips();
+      } catch (error) {
+        console.log('Could not fetch cloud payslips for comparison:', error.message);
+      }
+      
+      const cloudPayslipIds = new Set(cloudPayslips.map(p => p.id));
+      
       for (const payslip of localPayslips) {
-        await this.addPayslip(payslip);
+        try {
+          if (!cloudPayslipIds.has(payslip.id)) {
+            await this.addPayslip(payslip);
+            console.log(`Synced payslip ${payslip.id} to cloud`);
+          } else {
+            console.log(`Payslip ${payslip.id} already exists in cloud, skipping`);
+          }
+        } catch (error) {
+          console.log(`Failed to sync payslip ${payslip.id}:`, error.message);
+        }
       }
 
       // Sync settings
