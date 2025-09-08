@@ -646,12 +646,19 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           await syncDatabaseService.deletePayslip(payslipId);
           console.log('Successfully deleted from database');
           
+          // Immediately remove from local state
+          setPayslips(prevPayslips => prevPayslips.filter(p => p.id !== payslipId));
+          
           // Wait a moment for the deletion to propagate
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Clear local storage completely to force fresh fetch
+          localStorage.removeItem('payroll_app_payslips');
+          console.log('Cleared local payslips cache');
           
           // Refresh payslips from cloud to ensure deleted ones don't come back
-          const updatedPayslips = await syncDatabaseService.refreshPayslipsFromCloud();
-          console.log('Refreshed payslips from cloud:', updatedPayslips);
+          const updatedPayslips = await syncDatabaseService.getPayslips();
+          console.log('Refreshed payslips from database:', updatedPayslips);
           setPayslips(updatedPayslips);
           
           hideLoading();

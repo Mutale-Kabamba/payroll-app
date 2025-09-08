@@ -213,37 +213,43 @@ class CloudDatabaseService {
 
   async deletePayslip(payslipId) {
     try {
-      console.log(`Attempting to delete payslip from Firebase: ${payslipId}`);
+      console.log(`🗑️ CloudDatabaseService: Attempting to delete payslip from Firebase: ${payslipId}`);
       const docPath = this.getCompanyDocPath('payslips');
-      console.log(`Payslip collection path: ${docPath}`);
+      console.log(`📁 Payslip collection path: ${docPath}`);
       const payslipRef = doc(db, docPath, payslipId);
-      console.log(`Full payslip document path: ${docPath}/${payslipId}`);
+      console.log(`📄 Full payslip document path: ${docPath}/${payslipId}`);
       
       // Verify document exists before deletion
       const docSnapshot = await getDoc(payslipRef);
       if (!docSnapshot.exists()) {
-        console.log(`Payslip ${payslipId} does not exist in Firebase, skipping deletion`);
+        console.log(`❌ Payslip ${payslipId} does not exist in Firebase, skipping deletion`);
         this.deleteLocalPayslip(payslipId);
         return true;
       }
       
-      console.log(`Payslip ${payslipId} exists in Firebase, proceeding with deletion`);
+      console.log(`✅ Payslip ${payslipId} exists in Firebase, proceeding with deletion`);
+      console.log(`🧾 Payslip data:`, docSnapshot.data());
+      
       await deleteDoc(payslipRef);
-      console.log(`Successfully deleted payslip from Firebase: ${payslipId}`);
+      console.log(`🔥 Firebase deleteDoc() called for payslip: ${payslipId}`);
       
       // Verify deletion by checking if document still exists
       const verifySnapshot = await getDoc(payslipRef);
       if (verifySnapshot.exists()) {
+        console.error(`❌ ERROR: Payslip ${payslipId} still exists after deletion attempt!`);
+        console.error('Verification data:', verifySnapshot.data());
         throw new Error(`Payslip ${payslipId} still exists after deletion attempt`);
       }
-      console.log(`Verified: Payslip ${payslipId} successfully removed from Firebase`);
+      console.log(`✅ VERIFIED: Payslip ${payslipId} successfully removed from Firebase`);
       
       // Also delete from localStorage
       this.deleteLocalPayslip(payslipId);
+      console.log(`🗑️ Local payslip ${payslipId} also deleted`);
       return true;
     } catch (error) {
-      console.error('Error deleting payslip from Firebase:', error);
-      console.error('Falling back to local delete only');
+      console.error('❌ Error deleting payslip from Firebase:', error);
+      console.error('❌ Error stack:', error.stack);
+      console.error('❌ Falling back to local delete only');
       return this.deleteLocalPayslip(payslipId);
     }
   }

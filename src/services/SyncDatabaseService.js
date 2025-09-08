@@ -8,6 +8,8 @@ class SyncDatabaseService {
     this.localService = databaseService;
     this.isOnline = navigator.onLine;
     this.syncQueue = [];
+    this.recentDeletions = new Set(); // Track recently deleted payslip IDs
+    this.deletionTimestamps = new Map(); // Track when items were deleted
     
     // Listen for online/offline events
     window.addEventListener('online', () => {
@@ -18,6 +20,17 @@ class SyncDatabaseService {
     window.addEventListener('offline', () => {
       this.isOnline = false;
     });
+    
+    // Clean up old deletion tracking periodically
+    setInterval(() => {
+      const now = Date.now();
+      for (const [id, timestamp] of this.deletionTimestamps.entries()) {
+        if (now - timestamp > 10000) { // Remove after 10 seconds
+          this.recentDeletions.delete(id);
+          this.deletionTimestamps.delete(id);
+        }
+      }
+    }, 5000); // Check every 5 seconds
     
     // Don't auto-initialize sync - let components control when to sync
   }
@@ -256,37 +269,59 @@ class SyncDatabaseService {
           const cloudPayslips = await this.cloudService.getPayslips();
           const localPayslips = this.localService.getPayslips();
           
-          console.log(`Found ${cloudPayslips.length} payslips in cloud, ${localPayslips.length} locally`);
+          console.log(`📊 Found ${cloudPayslips.length} payslips in cloud, ${localPayslips.length} locally`);
           
-          if (cloudPayslips.length > 0) {
-            // Use cloud data as the source of truth, but don't overwrite if local has more recent data
-            this.localService.setPayslips(cloudPayslips);
-            return cloudPayslips;
+          // Filter out recently deleted payslips from cloud data
+          const filteredCloudPayslips = cloudPayslips.filter(payslip => {
+            const isRecentlyDeleted = this.recentDeletions.has(payslip.id);
+            if (isRecentlyDeleted) {
+              console.log(`🚫 Filtering out recently deleted payslip: ${payslip.id}`);
+            }
+            return !isRecentlyDeleted;
+          });
+          
+          console.log(`📊 After filtering recently deleted: ${filteredCloudPayslips.length} cloud payslips`);
+          
+          if (filteredCloudPayslips.length > 0) {
+            // Use filtered cloud data as the source of truth
+            this.localService.setPayslips(filteredCloudPayslips);
+            return filteredCloudPayslips;
           } else if (localPayslips.length > 0) {
             // Cloud is empty but local has data, sync local to cloud
-            console.log('Cloud is empty, syncing local payslips to cloud');
+            console.log('☁️ Cloud is empty, syncing local payslips to cloud');
             try {
               for (const payslip of localPayslips) {
-                await this.cloudService.addPayslip(payslip);
+                // Don't sync recently deleted payslips back to cloud
+                if (!this.recentDeletions.has(payslip.id)) {
+                  await this.cloudService.addPayslip(payslip);
+                }
               }
             } catch (syncError) {
-              console.log('Failed to sync local payslips to cloud:', syncError);
+              console.log('❌ Failed to sync local payslips to cloud:', syncError);
             }
-            return localPayslips;
+            // Filter out recently deleted from local too
+            const filteredLocalPayslips = localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
+            return filteredLocalPayslips;
           } else {
             // Both are empty
             return [];
           }
         } catch (cloudError) {
-          console.error('Cloud service error for payslips, falling back to local:', cloudError);
-          return this.localService.getPayslips();
+          console.error('☁️ Cloud service error for payslips, falling back to local:', cloudError);
+          const localPayslips = this.localService.getPayslips();
+          // Filter out recently deleted from local too
+          return localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
         }
       } else {
-        return this.localService.getPayslips();
+        const localPayslips = this.localService.getPayslips();
+        // Filter out recently deleted from local too
+        return localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
       }
     } catch (error) {
-      console.error('Error getting payslips, falling back to local:', error);
-      return this.localService.getPayslips();
+      console.error('❌ Error getting payslips, falling back to local:', error);
+      const localPayslips = this.localService.getPayslips();
+      // Filter out recently deleted from local too
+      return localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
     }
   }
 
@@ -335,28 +370,38 @@ class SyncDatabaseService {
 
   async deletePayslip(payslipId) {
     try {
-      console.log(`SyncDatabaseService: Deleting payslip ${payslipId}`);
+      console.log(`🗑️ SyncDatabaseService: Deleting payslip ${payslipId}`);
+      
+      // Track this deletion to prevent re-sync
+      this.recentDeletions.add(payslipId);
+      this.deletionTimestamps.set(payslipId, Date.now());
+      console.log(`⏰ Tracking deletion of payslip ${payslipId} for next 10 seconds`);
       
       // Always delete locally first
       this.localService.deletePayslip(payslipId);
-      console.log(`Local deletion successful for payslip ${payslipId}`);
+      console.log(`🏠 Local deletion successful for payslip ${payslipId}`);
       
       if (this.isOnline) {
         try {
           await this.cloudService.deletePayslip(payslipId);
-          console.log(`Cloud deletion successful for payslip ${payslipId}`);
+          console.log(`☁️ Cloud deletion successful for payslip ${payslipId}`);
+          
+          // Clear localStorage cache to prevent restoration
+          localStorage.removeItem('payroll_app_payslips');
+          console.log(`🧹 Cleared payslips cache after deletion`);
+          
         } catch (cloudError) {
-          console.error(`Cloud deletion failed for payslip ${payslipId}, adding to sync queue:`, cloudError);
+          console.error(`☁️ Cloud deletion failed for payslip ${payslipId}, adding to sync queue:`, cloudError);
           this.addToSyncQueue('deletePayslip', { id: payslipId });
         }
       } else {
-        console.log(`Offline: Adding payslip ${payslipId} deletion to sync queue`);
+        console.log(`📴 Offline: Adding payslip ${payslipId} deletion to sync queue`);
         this.addToSyncQueue('deletePayslip', { id: payslipId });
       }
       
       return true;
     } catch (error) {
-      console.error('Error deleting payslip:', error);
+      console.error('❌ Error deleting payslip:', error);
       throw error;
     }
   }
