@@ -464,7 +464,10 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       // Save to database
       await syncDatabaseService.addPayslip(newPayslip);
       
-      // Update local state
+      // Clean up any duplicates immediately after adding
+      await syncDatabaseService.cleanupDuplicatePayslips();
+      
+      // Update local state with cleaned data
       const updatedPayslips = await syncDatabaseService.getPayslips();
       setPayslips(updatedPayslips);
 
