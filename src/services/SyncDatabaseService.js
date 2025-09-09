@@ -8,8 +8,6 @@ class SyncDatabaseService {
     this.localService = databaseService;
     this.isOnline = navigator.onLine;
     this.syncQueue = [];
-    this.recentDeletions = new Set(); // Track recently deleted payslip IDs
-    this.deletionTimestamps = new Map(); // Track when items were deleted
     
     // Listen for online/offline events
     window.addEventListener('online', () => {
@@ -21,18 +19,8 @@ class SyncDatabaseService {
       this.isOnline = false;
     });
     
-    // Clean up old deletion tracking periodically
-    setInterval(() => {
-      const now = Date.now();
-      for (const [id, timestamp] of this.deletionTimestamps.entries()) {
-        if (now - timestamp > 10000) { // Remove after 10 seconds
-          this.recentDeletions.delete(id);
-          this.deletionTimestamps.delete(id);
-        }
-      }
-    }, 5000); // Check every 5 seconds
-    
-    // Don't auto-initialize sync - let components control when to sync
+    // Initialize sync
+    this.initializeSync();
   }
 
   async initializeSync() {
@@ -98,92 +86,27 @@ class SyncDatabaseService {
     try {
       if (this.isOnline) {
         try {
+          // Get employees from cloud (Firebase) only
           const cloudEmployees = await this.cloudService.getEmployees();
-          // Only update local storage with cloud data if cloud has data OR local is empty
-          const localEmployees = this.localService.getEmployees();
+          console.log('Fetched employees from Firebase:', cloudEmployees);
+          
+          // Update local storage with cloud data for offline access
           if (cloudEmployees.length > 0) {
             this.localService.setEmployees(cloudEmployees);
-            return cloudEmployees;
-          } else if (localEmployees.length > 0) {
-            // Cloud is empty but local has data, use local and sync to cloud
-            try {
-              for (const employee of localEmployees) {
-                await this.cloudService.addEmployee(employee);
-              }
-            } catch (syncError) {
-              console.log('Failed to sync local employees to cloud:', syncError);
-            }
-            return localEmployees;
-          } else {
-            // Both cloud and local are empty - check if user has deliberately cleared all data
-            const hasBeenInitialized = localStorage.getItem('payroll_app_initialized');
-            const deliberatelyCleared = localStorage.getItem('payroll_app_deliberately_cleared');
-            
-            if (!hasBeenInitialized && !deliberatelyCleared) {
-              // First time setup - initialize with defaults
-              this.localService.initializeDatabase();
-              const initializedEmployees = this.localService.getEmployees();
-              // Try to sync initialized data to cloud
-              try {
-                for (const employee of initializedEmployees) {
-                  await this.cloudService.addEmployee(employee);
-                }
-              } catch (syncError) {
-                console.log('Failed to sync initialized employees to cloud:', syncError);
-              }
-              return initializedEmployees;
-            } else {
-              // User has previously used the system and/or deliberately deleted all employees
-              // Respect their choice and return empty array
-              return [];
-            }
           }
+          
+          return cloudEmployees; // Return Firebase data only, even if empty
         } catch (cloudError) {
           console.error('Cloud service error, falling back to local:', cloudError);
-          // When falling back to local, also check if we should initialize
-          const localEmployees = this.localService.getEmployees();
-          if (localEmployees.length === 0) {
-            const hasBeenInitialized = localStorage.getItem('payroll_app_initialized');
-            const deliberatelyCleared = localStorage.getItem('payroll_app_deliberately_cleared');
-            
-            if (!hasBeenInitialized && !deliberatelyCleared) {
-              // First time setup - initialize with defaults
-              this.localService.initializeDatabase();
-              return this.localService.getEmployees();
-            }
-          }
-          return localEmployees;
+          return this.localService.getEmployees();
         }
       } else {
-        // When offline, also check if we should initialize
-        const localEmployees = this.localService.getEmployees();
-        if (localEmployees.length === 0) {
-          const hasBeenInitialized = localStorage.getItem('payroll_app_initialized');
-          const deliberatelyCleared = localStorage.getItem('payroll_app_deliberately_cleared');
-          
-          if (!hasBeenInitialized && !deliberatelyCleared) {
-            // First time setup - initialize with defaults
-            this.localService.initializeDatabase();
-            return this.localService.getEmployees();
-          }
-        }
-        return localEmployees;
+        // When offline, return local data (which should be synced from Firebase)
+        return this.localService.getEmployees();
       }
     } catch (error) {
       console.error('Error getting employees, falling back to local:', error);
-      // Final fallback - also check if we should initialize
-      const localEmployees = this.localService.getEmployees();
-      if (localEmployees.length === 0) {
-        const hasBeenInitialized = localStorage.getItem('payroll_app_initialized');
-        const deliberatelyCleared = localStorage.getItem('payroll_app_deliberately_cleared');
-        
-        if (!hasBeenInitialized && !deliberatelyCleared) {
-          // First time setup - initialize with defaults
-          this.localService.initializeDatabase();
-          return this.localService.getEmployees();
-        }
-      }
-      return localEmployees;
+      return this.localService.getEmployees();
     }
   }
 
@@ -235,22 +158,16 @@ class SyncDatabaseService {
 
   async deleteEmployee(employeeId) {
     try {
-      console.log(`SyncDatabaseService: Deleting employee ${employeeId}`);
-      
       // Always delete locally first
       this.localService.deleteEmployee(employeeId);
-      console.log(`Local deletion successful for employee ${employeeId}`);
       
       if (this.isOnline) {
         try {
           await this.cloudService.deleteEmployee(employeeId);
-          console.log(`Cloud deletion successful for employee ${employeeId}`);
         } catch (cloudError) {
-          console.error(`Cloud deletion failed for employee ${employeeId}, adding to sync queue:`, cloudError);
           this.addToSyncQueue('deleteEmployee', { id: employeeId });
         }
       } else {
-        console.log(`Offline: Adding employee ${employeeId} deletion to sync queue`);
         this.addToSyncQueue('deleteEmployee', { id: employeeId });
       }
       
@@ -270,107 +187,15 @@ class SyncDatabaseService {
       console.log('⏰ Deletion timestamps:', Object.fromEntries(this.deletionTimestamps));
       
       if (this.isOnline) {
-        try {
-          console.log('☁️ Fetching payslips from cloud...');
-          const cloudPayslips = await this.cloudService.getPayslips();
-          console.log('☁️ Raw cloud payslips:', cloudPayslips.length);
-          
-          console.log('🏠 Fetching payslips from local...');
-          const localPayslips = this.localService.getPayslips();
-          console.log('🏠 Raw local payslips:', localPayslips.length);
-          
-          console.log(`📊 Found ${cloudPayslips.length} payslips in cloud, ${localPayslips.length} locally`);
-          
-          // Filter out recently deleted payslips from cloud data
-          const filteredCloudPayslips = cloudPayslips.filter(payslip => {
-            const isRecentlyDeleted = this.recentDeletions.has(payslip.id);
-            if (isRecentlyDeleted) {
-              console.log(`🚫 Filtering out recently deleted payslip: ${payslip.id}`);
-            }
-            return !isRecentlyDeleted;
-          });
-          
-          console.log(`📊 After filtering recently deleted: ${filteredCloudPayslips.length} cloud payslips`);
-          
-          if (filteredCloudPayslips.length > 0) {
-            // Use filtered cloud data as the source of truth
-            console.log('☁️ Using cloud data as source of truth');
-            this.localService.setPayslips(filteredCloudPayslips);
-            return filteredCloudPayslips;
-          } else if (localPayslips.length > 0) {
-            // Cloud is empty but local has data, sync local to cloud
-            console.log('☁️ Cloud is empty, syncing local payslips to cloud');
-            try {
-              for (const payslip of localPayslips) {
-                // Don't sync recently deleted payslips back to cloud
-                if (!this.recentDeletions.has(payslip.id)) {
-                  console.log('⬆️ Syncing payslip to cloud:', payslip.id);
-                  await this.cloudService.addPayslip(payslip);
-                } else {
-                  console.log('🚫 Not syncing recently deleted payslip:', payslip.id);
-                }
-              }
-            } catch (syncError) {
-              console.log('❌ Failed to sync local payslips to cloud:', syncError);
-            }
-            // Filter out recently deleted from local too
-            const filteredLocalPayslips = localPayslips.filter(payslip => {
-              const isRecentlyDeleted = this.recentDeletions.has(payslip.id);
-              if (isRecentlyDeleted) {
-                console.log(`🚫 Filtering out recently deleted local payslip: ${payslip.id}`);
-              }
-              return !isRecentlyDeleted;
-            });
-            console.log(`🏠 Returning ${filteredLocalPayslips.length} filtered local payslips`);
-            return filteredLocalPayslips;
-          } else {
-            // Both are empty
-            console.log('📭 Both cloud and local are empty');
-            return [];
-          }
-        } catch (cloudError) {
-          console.error('☁️ Cloud service error for payslips, falling back to local:', cloudError);
-          const localPayslips = this.localService.getPayslips();
-          // Filter out recently deleted from local too
-          const filtered = localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
-          console.log(`🏠 Fallback: Returning ${filtered.length} filtered local payslips`);
-          return filtered;
-        }
-      } else {
-        console.log('📴 Offline: Using local payslips only');
-        const localPayslips = this.localService.getPayslips();
-        // Filter out recently deleted from local too
-        const filtered = localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
-        console.log(`🏠 Offline: Returning ${filtered.length} filtered local payslips`);
-        return filtered;
-      }
-    } catch (error) {
-      console.error('❌ Error getting payslips, falling back to local:', error);
-      const localPayslips = this.localService.getPayslips();
-      // Filter out recently deleted from local too
-      const filtered = localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
-      console.log(`🏠 Error fallback: Returning ${filtered.length} filtered local payslips`);
-      return filtered;
-    }
-  }
-
-  // Force refresh payslips from cloud (useful after deletions)
-  async refreshPayslipsFromCloud() {
-    try {
-      if (this.isOnline) {
-        console.log('Force refreshing payslips from cloud...');
         const cloudPayslips = await this.cloudService.getPayslips();
-        console.log(`Fetched ${cloudPayslips.length} payslips from cloud`);
-        
         // Update local storage with cloud data
         this.localService.setPayslips(cloudPayslips);
         return cloudPayslips;
       } else {
-        console.log('Offline: Cannot refresh from cloud, returning local payslips');
         return this.localService.getPayslips();
       }
     } catch (error) {
-      console.error('Error refreshing payslips from cloud:', error);
+      console.error('Error getting payslips, falling back to local:', error);
       return this.localService.getPayslips();
     }
   }
@@ -399,38 +224,22 @@ class SyncDatabaseService {
 
   async deletePayslip(payslipId) {
     try {
-      console.log(`🗑️ SyncDatabaseService: Deleting payslip ${payslipId}`);
-      
-      // Track this deletion to prevent re-sync
-      this.recentDeletions.add(payslipId);
-      this.deletionTimestamps.set(payslipId, Date.now());
-      console.log(`⏰ Tracking deletion of payslip ${payslipId} for next 10 seconds`);
-      
       // Always delete locally first
       this.localService.deletePayslip(payslipId);
-      console.log(`🏠 Local deletion successful for payslip ${payslipId}`);
       
       if (this.isOnline) {
         try {
           await this.cloudService.deletePayslip(payslipId);
-          console.log(`☁️ Cloud deletion successful for payslip ${payslipId}`);
-          
-          // Clear localStorage cache to prevent restoration
-          localStorage.removeItem('payroll_app_payslips');
-          console.log(`🧹 Cleared payslips cache after deletion`);
-          
         } catch (cloudError) {
-          console.error(`☁️ Cloud deletion failed for payslip ${payslipId}, adding to sync queue:`, cloudError);
           this.addToSyncQueue('deletePayslip', { id: payslipId });
         }
       } else {
-        console.log(`📴 Offline: Adding payslip ${payslipId} deletion to sync queue`);
         this.addToSyncQueue('deletePayslip', { id: payslipId });
       }
       
       return true;
     } catch (error) {
-      console.error('❌ Error deleting payslip:', error);
+      console.error('Error deleting payslip:', error);
       throw error;
     }
   }
@@ -440,9 +249,14 @@ class SyncDatabaseService {
     try {
       if (this.isOnline) {
         const cloudSettings = await this.cloudService.getPayrollSettings();
-        // Update local storage with cloud data
-        this.localService.setPayrollSettings(cloudSettings);
-        return cloudSettings;
+        // Only update local storage if cloud settings exist
+        if (cloudSettings) {
+          this.localService.setPayrollSettings(cloudSettings);
+          return cloudSettings;
+        } else {
+          // No settings in cloud, return default local settings
+          return this.localService.getPayrollSettings();
+        }
       } else {
         return this.localService.getPayrollSettings();
       }
@@ -580,10 +394,6 @@ class SyncDatabaseService {
       // Clear local data
       this.localService.clearAllData();
       
-      // Set flag to indicate user deliberately cleared all data
-      localStorage.setItem('payroll_app_initialized', 'true');
-      localStorage.setItem('payroll_app_deliberately_cleared', 'true');
-      
       if (this.isOnline) {
         // Note: Clearing cloud data would require implementing batch delete
         console.log('Local data cleared. Cloud data clearing not implemented for safety.');
@@ -599,9 +409,11 @@ class SyncDatabaseService {
     }
   }
 
-  // Initialize database
+  // Initialize database - no auto data creation
   initializeDatabase() {
-    return this.localService.initializeDatabase();
+    // No automatic initialization - system only shows Firebase data
+    console.log('SyncDatabaseService initialized - will only use Firebase data');
+    return true;
   }
 }
 

@@ -2,141 +2,14 @@
 class DatabaseService {
   constructor() {
     this.storagePrefix = 'payroll_app_';
-    // Don't auto-initialize - let SyncDatabaseService control initialization
+    this.initializeDatabase();
   }
 
-  // Initialize database with default data only on first use (not when all employees are deleted)
+  // Initialize database with empty state - no auto data creation
   initializeDatabase() {
-    const employees = this.getEmployees();
-    // Only initialize defaults if no employees exist AND no 'initialized' flag is set AND user hasn't deliberately cleared data
-    const hasBeenInitialized = localStorage.getItem(`${this.storagePrefix}initialized`);
-    const deliberatelyCleared = localStorage.getItem('payroll_app_deliberately_cleared');
-    
-    if (employees.length === 0 && !hasBeenInitialized && !deliberatelyCleared) {
-      this.initializeDefaultEmployees();
-      // Set flag to prevent re-initialization when all employees are deleted
-      localStorage.setItem(`${this.storagePrefix}initialized`, 'true');
-    }
-  }
-
-  // Initialize with default employee data
-  initializeDefaultEmployees() {
-    const defaultEmployees = [
-      {
-        id: 'LEW001',
-        name: 'LESA LEWIS',
-        nrc: '217589/68/1',
-        ssn: '911834888',
-        gender: 'Male',
-        designation: 'DRIVER',
-        dateOfJoining: '1973-12-05',
-        basicPay: 3000.00,
-        transportAllowance: 200.00,
-        mealAllowance: 0,
-        address: 'C153 Linda - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '911834888',
-        nhima: '233266971110112'
-      },
-      {
-        id: 'WIN002',
-        name: 'KASENGA WINTER',
-        nrc: '633347/11/1',
-        ssn: '208975378',
-        gender: 'Male',
-        designation: 'DRIVER',
-        dateOfJoining: '1976-05-20',
-        basicPay: 3000.00,
-        transportAllowance: 200.00,
-        mealAllowance: 0,
-        address: '121 Dambwa North - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '208975378',
-        nhima: '233282691110119'
-      },
-      {
-        id: 'HAR003',
-        name: 'NDHLOVU HARRISON',
-        nrc: '231690/7/1',
-        ssn: '905369104',
-        gender: 'Male',
-        designation: 'GENERAL WORKER',
-        dateOfJoining: '1986-03-05',
-        basicPay: 1500.00,
-        transportAllowance: 150.00,
-        mealAllowance: 0,
-        address: 'C31 Linda - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '905369104',
-        nhima: '233282601110116'
-      },
-      {
-        id: 'CHI004',
-        name: 'KANEKWA CHIMBUNYA ISAAC',
-        nrc: '328165/71/1',
-        ssn: '941778636',
-        gender: 'Male',
-        designation: 'GENERAL WORKER',
-        dateOfJoining: '1998-12-10',
-        basicPay: 1500.00,
-        transportAllowance: 150.00,
-        mealAllowance: 0,
-        address: 'C75 Maramba - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '941778636',
-        nhima: '233296321110141'
-      },
-      {
-        id: 'ABR005',
-        name: 'KANG\'OTI BYEMBA ABRAHAM',
-        nrc: '198290/84/1',
-        ssn: '',
-        gender: 'Male',
-        designation: 'GENERAL WORKER',
-        dateOfJoining: '1969-08-18',
-        basicPay: 700.00,
-        transportAllowance: 100.00,
-        mealAllowance: 0,
-        address: '2670 Senanga Rd - Livingstone',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '',
-        nhima: ''
-      },
-      {
-        id: 'KAB006',
-        name: 'MUTALE KABAMBA',
-        nrc: '317029/68/1',
-        ssn: '320434124',
-        gender: 'Male',
-        designation: 'MANAGER',
-        dateOfJoining: '1998-04-03',
-        basicPay: 4000.00,
-        transportAllowance: 300.00,
-        mealAllowance: 200.00,
-        address: '10A Off Natwange Road - Livingstone',
-        department: 'IT & ACCOUNTS',
-        napsa: '320434124',
-        nhima: '322002911110110'
-      },
-      {
-        id: 'DAN007',
-        name: 'MWAANGA MWALE M. DANIEL',
-        nrc: '510487/71/1',
-        ssn: '912775251',
-        gender: 'Male',
-        designation: 'DRIVER',
-        dateOfJoining: '',
-        basicPay: 1500.00,
-        transportAllowance: 200.00,
-        mealAllowance: 0,
-        address: '',
-        department: 'OPERATIONS & LOGISTICS',
-        napsa: '912775251',
-        nhima: '219861681110117'
-      }
-    ];
-
-    this.setEmployees(defaultEmployees);
+    // No automatic data initialization
+    // The system will only show data from Firebase
+    console.log('Database service initialized - no default data will be created');
   }
 
   // Helper method to get storage key
@@ -328,7 +201,6 @@ class DatabaseService {
     localStorage.removeItem(this.getStorageKey('employees'));
     localStorage.removeItem(this.getStorageKey('payslips'));
     localStorage.removeItem(this.getStorageKey('payroll_settings'));
-    // Don't remove the initialization flag here - let SyncDatabaseService handle it
   }
 
   // Get storage usage information
