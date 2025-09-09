@@ -150,14 +150,9 @@ class CloudDatabaseService {
       if (snapshot.exists()) {
         return snapshot.data();
       } else {
-        // Return default settings
-        const defaultSettings = {
-          payPeriod: 'August 2024',
-          workedDays: 26,
-          totalDays: 30
-        };
-        await this.setPayrollSettings(defaultSettings);
-        return defaultSettings;
+        // Return null if no settings exist - don't auto-create
+        console.log('No payroll settings found in Firebase');
+        return null;
       }
     } catch (error) {
       console.error('Error getting payroll settings:', error);
