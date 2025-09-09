@@ -54,14 +54,21 @@ useEffect(() => {
     const loadData = async () => {
         setSyncStatus('syncing');
         try {
+            console.log('🚀 INITIAL LOAD: Starting data load...');
+            
             // Load employees from sync service
             const employees = await syncDatabaseService.getEmployees();
-            console.log('Loaded employees:', employees);
+            console.log('👥 Loaded employees:', employees);
             setEmployeeDatabase(employees);
 
             // Load payslips from sync service
+            console.log('📄 Loading payslips from sync service...');
             const savedPayslips = await syncDatabaseService.getPayslips();
-            console.log('Loaded payslips:', savedPayslips);
+            console.log('📊 Loaded payslips:', savedPayslips);
+            console.log('📈 Payslips count:', savedPayslips.length);
+            savedPayslips.forEach(payslip => {
+                console.log('📋 Payslip:', payslip.id, 'for employee:', payslip.employeeName || payslip.employeeId);
+            });
             setPayslips(savedPayslips);
 
             // Load payroll settings from sync service
@@ -623,14 +630,14 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
   };
 
   const deletePayslip = (payslipId) => {
-    console.log('Delete payslip called with ID:', payslipId);
-    console.log('Current payslips:', payslips);
+    console.log('🗑️ Delete payslip called with ID:', payslipId);
+    console.log('📊 Current payslips:', payslips);
     
     const payslip = payslips.find(p => p.id === payslipId);
-    console.log('Found payslip to delete:', payslip);
+    console.log('🔍 Found payslip to delete:', payslip);
     
     if (!payslip) {
-      console.error('Payslip not found with ID:', payslipId);
+      console.error('❌ Payslip not found with ID:', payslipId);
       showError('Payslip not found');
       return;
     }
@@ -639,26 +646,42 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       'Are you sure you want to delete this payslip? This action cannot be undone.',
       async () => {
         try {
-          console.log('Starting delete operation for payslip ID:', payslipId);
+          console.log('🚀 Starting delete operation for payslip ID:', payslipId);
           showLoading('Deleting payslip...');
           
-          // Delete from database service
-          await syncDatabaseService.deletePayslip(payslipId);
-          console.log('Successfully deleted from database');
-          
-          // Immediately remove from local state
-          setPayslips(prevPayslips => prevPayslips.filter(p => p.id !== payslipId));
-          
-          // Wait a moment for the deletion to propagate
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Clear local storage completely to force fresh fetch
+          // STEP 1: Clear all caches BEFORE deletion
           localStorage.removeItem('payroll_app_payslips');
-          console.log('Cleared local payslips cache');
+          localStorage.removeItem('payroll_employees');
+          console.log('🧹 PRE-DELETE: Cleared all local caches');
           
-          // Refresh payslips from cloud to ensure deleted ones don't come back
+          // STEP 2: Immediately remove from local state
+          console.log('📝 STEP 2: Removing from local state');
+          setPayslips(prevPayslips => {
+            const filtered = prevPayslips.filter(p => p.id !== payslipId);
+            console.log('🔄 State update: from', prevPayslips.length, 'to', filtered.length, 'payslips');
+            return filtered;
+          });
+          
+          // STEP 3: Delete from database service
+          console.log('🗄️ STEP 3: Deleting from database service');
+          await syncDatabaseService.deletePayslip(payslipId);
+          console.log('✅ Successfully deleted from database');
+          
+          // STEP 4: Wait and clear caches again
+          console.log('⏰ STEP 4: Waiting 3 seconds for deletion to propagate');
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // Clear caches again
+          localStorage.removeItem('payroll_app_payslips');
+          localStorage.removeItem('payroll_employees');
+          console.log('🧹 POST-DELETE: Cleared all local caches again');
+          
+          // STEP 5: Force refresh from database
+          console.log('🔄 STEP 5: Force refreshing from database');
           const updatedPayslips = await syncDatabaseService.getPayslips();
-          console.log('Refreshed payslips from database:', updatedPayslips);
+          console.log('📊 Refreshed payslips from database:', updatedPayslips);
+          console.log('🔍 Checking if deleted payslip still exists:', updatedPayslips.find(p => p.id === payslipId));
+          
           setPayslips(updatedPayslips);
           
           hideLoading();

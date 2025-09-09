@@ -264,10 +264,20 @@ class SyncDatabaseService {
   // PAYSLIP METHODS
   async getPayslips() {
     try {
+      console.log('🔍 getPayslips() called');
+      console.log('📡 Online status:', this.isOnline);
+      console.log('🚫 Recent deletions:', Array.from(this.recentDeletions));
+      console.log('⏰ Deletion timestamps:', Object.fromEntries(this.deletionTimestamps));
+      
       if (this.isOnline) {
         try {
+          console.log('☁️ Fetching payslips from cloud...');
           const cloudPayslips = await this.cloudService.getPayslips();
+          console.log('☁️ Raw cloud payslips:', cloudPayslips.length);
+          
+          console.log('🏠 Fetching payslips from local...');
           const localPayslips = this.localService.getPayslips();
+          console.log('🏠 Raw local payslips:', localPayslips.length);
           
           console.log(`📊 Found ${cloudPayslips.length} payslips in cloud, ${localPayslips.length} locally`);
           
@@ -284,6 +294,7 @@ class SyncDatabaseService {
           
           if (filteredCloudPayslips.length > 0) {
             // Use filtered cloud data as the source of truth
+            console.log('☁️ Using cloud data as source of truth');
             this.localService.setPayslips(filteredCloudPayslips);
             return filteredCloudPayslips;
           } else if (localPayslips.length > 0) {
@@ -293,35 +304,53 @@ class SyncDatabaseService {
               for (const payslip of localPayslips) {
                 // Don't sync recently deleted payslips back to cloud
                 if (!this.recentDeletions.has(payslip.id)) {
+                  console.log('⬆️ Syncing payslip to cloud:', payslip.id);
                   await this.cloudService.addPayslip(payslip);
+                } else {
+                  console.log('🚫 Not syncing recently deleted payslip:', payslip.id);
                 }
               }
             } catch (syncError) {
               console.log('❌ Failed to sync local payslips to cloud:', syncError);
             }
             // Filter out recently deleted from local too
-            const filteredLocalPayslips = localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
+            const filteredLocalPayslips = localPayslips.filter(payslip => {
+              const isRecentlyDeleted = this.recentDeletions.has(payslip.id);
+              if (isRecentlyDeleted) {
+                console.log(`🚫 Filtering out recently deleted local payslip: ${payslip.id}`);
+              }
+              return !isRecentlyDeleted;
+            });
+            console.log(`🏠 Returning ${filteredLocalPayslips.length} filtered local payslips`);
             return filteredLocalPayslips;
           } else {
             // Both are empty
+            console.log('📭 Both cloud and local are empty');
             return [];
           }
         } catch (cloudError) {
           console.error('☁️ Cloud service error for payslips, falling back to local:', cloudError);
           const localPayslips = this.localService.getPayslips();
           // Filter out recently deleted from local too
-          return localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
+          const filtered = localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
+          console.log(`🏠 Fallback: Returning ${filtered.length} filtered local payslips`);
+          return filtered;
         }
       } else {
+        console.log('📴 Offline: Using local payslips only');
         const localPayslips = this.localService.getPayslips();
         // Filter out recently deleted from local too
-        return localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
+        const filtered = localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
+        console.log(`🏠 Offline: Returning ${filtered.length} filtered local payslips`);
+        return filtered;
       }
     } catch (error) {
       console.error('❌ Error getting payslips, falling back to local:', error);
       const localPayslips = this.localService.getPayslips();
       // Filter out recently deleted from local too
-      return localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
+      const filtered = localPayslips.filter(payslip => !this.recentDeletions.has(payslip.id));
+      console.log(`🏠 Error fallback: Returning ${filtered.length} filtered local payslips`);
+      return filtered;
     }
   }
 
