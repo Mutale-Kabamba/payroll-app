@@ -474,6 +474,14 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       hideLoading();
       showSuccess(`Payslip generated successfully for ${employee.name}!`);
       setSelectedEmployeeForPayslip('');
+      
+      // Reset payslip form
+      setNewPayslip({
+        employeeId: '',
+        otherEarnings: [],
+        otherDeductions: []
+      });
+      
       setIsCreatingPayslip(false);
     } catch (error) {
       console.error('Error generating payslip:', error);
@@ -541,17 +549,12 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           console.log('🚀 Starting delete operation for payslip ID:', payslipId);
           showLoading('Deleting payslip...');
           
-          // STEP 1: Clear all caches BEFORE deletion
-          localStorage.removeItem('payroll_app_payslips');
-          localStorage.removeItem('payroll_employees');
-          console.log('🧹 PRE-DELETE: Cleared all local caches');
+          // Delete from database
+          await syncDatabaseService.deletePayslip(payslipId);
           
-          // Immediately update local state to reflect the change
-          setPayslips(prevPayslips => {
-            const filtered = prevPayslips.filter(p => p.id !== payslipId);
-            console.log('Updated payslips after delete:', filtered);
-            return filtered;
-          });
+          // Update local state with fresh data
+          const updatedPayslips = await syncDatabaseService.getPayslips();
+          setPayslips(updatedPayslips);
           
           hideLoading();
           closeModal('confirm');
@@ -3319,7 +3322,17 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       {/* Beautiful Notification Modals */}
       <SuccessModal
         isOpen={modals.success.isOpen}
-        onClose={() => closeModal('success')}
+        onClose={() => {
+          closeModal('success');
+          // Auto-navigate after certain successful operations
+          if (currentView === 'addPayslip') {
+            setCurrentView('dashboard');
+          }
+          // If employee form is open after successful creation, close it
+          if (showEmployeeForm) {
+            setShowEmployeeForm(false);
+          }
+        }}
         title={modals.success.title}
         message={modals.success.message}
       />
