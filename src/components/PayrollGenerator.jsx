@@ -3328,6 +3328,10 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           if (currentView === 'addPayslip') {
             setCurrentView('dashboard');
           }
+          // Navigate to dashboard after data export success
+          if (currentView === 'dataManagement' && modals.success.title === 'Data Exported') {
+            setCurrentView('dashboard');
+          }
           // If employee form is open after successful creation, close it
           if (showEmployeeForm) {
             setShowEmployeeForm(false);
