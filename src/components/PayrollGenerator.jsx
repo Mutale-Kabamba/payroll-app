@@ -47,6 +47,16 @@ const [payrollData, setPayrollData] = useState({
     totalDays: 30
 });
 
+// Payslip creation form state
+const [payslipFormData, setPayslipFormData] = useState({
+    payPeriod: `${new Date().toLocaleString('default', { month: 'long' })} ${new Date().getFullYear()}`,
+    workedDays: 26,
+    totalDays: 30
+});
+
+// Dashboard filter state
+const [dashboardFilterPeriod, setDashboardFilterPeriod] = useState('');
+
 // Notification hook for beautiful modals
 const { modals, showSuccess, showError, showConfirm, showInfo, showLoading, hideLoading, closeModal } = useNotification();
 
@@ -130,12 +140,28 @@ useEffect(() => {
     saveSettings();
 }, [payrollData]);
 
+// Generate month options for current year automatically
+const getCurrentYearMonths = () => {
+    const currentYear = new Date().getFullYear();
+    const months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months.map(month => `${month} ${currentYear}`);
+};
+
 const payPeriodOptions = [
     'January 2024', 'February 2024', 'March 2024', 'April 2024', 'May 2024', 'June 2024',
     'July 2024', 'August 2024', 'September 2024', 'October 2024', 'November 2024', 'December 2024',
     'January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025',
     'July 2025', 'August 2025', 'September 2025', 'October 2025', 'November 2025', 'December 2025'
 ];
+
+// Get unique periods from existing payslips for dashboard filter
+const getAvailablePeriods = () => {
+    const periods = [...new Set(payslips.map(p => p.payPeriod).filter(Boolean))];
+    return periods.sort();
+};
 
 // Employee Management Functions
 const handleAddEmployee = async () => {
@@ -425,10 +451,10 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
       // Check if payslip already exists for this employee and pay period
       const existingPayslip = payslips.find(p => 
-        p.employeeId === employee.id && p.payPeriod === payrollData.payPeriod
+        p.employeeId === employee.id && p.payPeriod === payslipFormData.payPeriod
       );
       if (existingPayslip) {
-        showError(`Payslip already exists for ${employee.name} for ${payrollData.payPeriod}`);
+        showError(`Payslip already exists for ${employee.name} for ${payslipFormData.payPeriod}`);
         setIsCreatingPayslip(false);
         return;
       }
@@ -444,10 +470,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         name: employee.name,
         designation: employee.designation,
         nrc: employee.nrc,
+        dateOfJoining: employee.dateOfJoining,
+        gender: employee.gender,
+        ssn: employee.ssn,
         // Payroll data
-        payPeriod: payrollData.payPeriod,
-        workedDays: payrollData.workedDays,
-        totalDays: payrollData.totalDays,
+        payPeriod: payslipFormData.payPeriod,
+        workedDays: payslipFormData.workedDays,
+        totalDays: payslipFormData.totalDays,
         basicPay: parseFloat(employee.basicPay) || 0,
         transportAllowance: parseFloat(employee.transportAllowance) || 0,
         mealAllowance: parseFloat(employee.mealAllowance) || 0,
@@ -634,14 +663,22 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     return result;
   };
 
-  // Search filtering functions
-  const filterPayslips = (payslips, searchQuery) => {
+  // Search and period filtering functions
+  const filterPayslipsByPeriod = (payslips, selectedPeriod) => {
+    return payslips.filter(payslip => payslip.payPeriod === selectedPeriod);
+  };
+
+  const filterPayslips = (payslips, searchQuery, selectedPeriod = null) => {
+    // First filter by period if specified
+    let filteredPayslips = selectedPeriod ? filterPayslipsByPeriod(payslips, selectedPeriod) : payslips;
+    
+    // Then filter by search query if provided
     if (!searchQuery.trim()) {
-      return payslips;
+      return filteredPayslips;
     }
     
     const query = searchQuery.toLowerCase().trim();
-    return payslips.filter(payslip => {
+    return filteredPayslips.filter(payslip => {
       return (
         payslip.name?.toLowerCase().includes(query) ||
         payslip.id?.toLowerCase().includes(query) ||
@@ -669,48 +706,30 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     });
   };
 
-  const renderDashboard = () => (
+  const renderDashboard = () => {
+    const availablePeriods = getAvailablePeriods();
+    // Use dashboardFilterPeriod directly, don't auto-select if empty (empty means "All Periods")
+    const currentFilterPeriod = dashboardFilterPeriod;
+    
+    return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Pay Period Selector */}
+      {/* Pay Period Filter */}
       <div className="bg-white rounded-lg border border-gray-300 shadow-sm p-3 sm:p-4">
         <div className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
           <div className="flex-shrink-0">
-            <label className="text-sm font-medium text-gray-700">Pay Period:</label>
+            <label className="text-sm font-medium text-gray-700">Filter by Pay Period:</label>
           </div>
           <div className="flex-1">
             <select
-              value={payrollData.payPeriod}
-              onChange={(e) => setPayrollData({ ...payrollData, payPeriod: e.target.value })}
+              value={currentFilterPeriod || ""}
+              onChange={(e) => setDashboardFilterPeriod(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              {payPeriodOptions.map(period => (
+              <option value="">All Periods</option>
+              {availablePeriods.map(period => (
                 <option key={period} value={period}>{period}</option>
               ))}
             </select>
-          </div>
-          <div className="flex flex-col xs:flex-row gap-3 xs:gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Worked Days:</label>
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={payrollData.workedDays}
-                onChange={(e) => setPayrollData({ ...payrollData, workedDays: parseInt(e.target.value) || 0 })}
-                className="w-16 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Total Days:</label>
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={payrollData.totalDays}
-                onChange={(e) => setPayrollData({ ...payrollData, totalDays: parseInt(e.target.value) || 0 })}
-                className="w-16 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -766,8 +785,8 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               <Calendar className="h-6 w-6 text-purple-600" />
             </div>
             <div className="ml-4 flex-1 min-w-0">
-              <p className="text-sm text-gray-600">Pay Period</p>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{payrollData.payPeriod}</p>
+              <p className="text-sm text-gray-600">Viewing Period</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{currentFilterPeriod || 'All Periods'}</p>
             </div>
           </div>
         </div>
@@ -780,7 +799,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             <div>
               <h2 className="text-lg font-bold text-gray-900">Generated Payslips</h2>
               <p className="text-xs text-gray-600 mt-1">
-                {payrollData.payPeriod} • {filterPayslips(payslips, dashboardSearchQuery).length} payslip{filterPayslips(payslips, dashboardSearchQuery).length !== 1 ? 's' : ''}
+                {currentFilterPeriod || 'All Periods'} • {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length} payslip{filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length !== 1 ? 's' : ''}
               </p>
             </div>
             <div className="relative">
@@ -798,7 +817,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             <div className="flex flex-col xs:flex-row gap-2">
               <button
                 onClick={() => {
-                  const filteredPayslips = filterPayslips(payslips, dashboardSearchQuery);
+                  const filteredPayslips = filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod);
                   if (filteredPayslips.length === 0) {
                     showInfo('No payslips found matching your search criteria. Please try a different search term or create some payslips first.', 'No Payslips Found');
                     return;
@@ -810,7 +829,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                       <!DOCTYPE html>
                       <html>
                       <head>
-                        <title>Filtered Payslips - ${payrollData.payPeriod}</title>
+                        <title>Filtered Payslips - ${currentFilterPeriod || 'All Periods'}</title>
                         <style>
                           @page {
                             size: A4;
@@ -975,7 +994,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                             <div class="info-section">
                               <div class="info-row"><span class="label">Employee Number:</span> <span class="value">${payslip.employeeId}</span></div>
                               <div class="info-row"><span class="label">Date of Joining:</span> <span class="value">${payslip.dateOfJoining}</span></div>
-                              <div class="info-row"><span class="label">Pay Period:</span> <span class="value">${payslip.payrollPeriod}</span></div>
+                              <div class="info-row"><span class="label">Pay Period:</span> <span class="value">${payslip.payPeriod}</span></div>
                               <div class="info-row"><span class="label">Worked Days:</span> <span class="value">${payslip.workedDays || payrollData.workedDays}</span></div>
                               <div class="info-row"><span class="label">Designation:</span> <span class="value">${payslip.designation}</span></div>
                             </div>
@@ -1041,15 +1060,15 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                   };
                   exportFilteredPayslips();
                 }}
-                disabled={filterPayslips(payslips, dashboardSearchQuery).length === 0}
+                disabled={filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length === 0}
                 className={`px-3 py-2 rounded text-sm flex items-center gap-1 transition-colors min-h-touch ${
-                  filterPayslips(payslips, dashboardSearchQuery).length === 0 
+                  filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length === 0 
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                     : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
               >
                 <Download className="h-4 w-4" />
-                <span className="hidden xs:inline">Export {dashboardSearchQuery ? 'Filtered ' : 'All '}PDF</span>
+                <span className="hidden xs:inline">Export {dashboardSearchQuery ? 'Filtered ' : 'Period '}PDF</span>
                 <span className="xs:hidden">Export</span>
               </button>
               <button
@@ -1066,7 +1085,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         
         {/* Mobile Cards View (hidden on md and up) */}
         <div className="md:hidden">
-          {filterPayslips(payslips, dashboardSearchQuery).map((payslip) => {
+          {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).map((payslip) => {
             const calculatedPayslip = calculatePayslip(payslip);
             return (
               <div key={payslip.id} className="bg-white border-b border-gray-200 p-4">
@@ -1140,7 +1159,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </div>
             );
           })}
-          {filterPayslips(payslips, dashboardSearchQuery).length === 0 && payslips.length > 0 && dashboardSearchQuery && (
+          {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length === 0 && payslips.length > 0 && dashboardSearchQuery && (
             <div className="p-8 text-center">
               <div className="flex flex-col items-center">
                 <Search className="h-12 w-12 text-gray-400 mb-4" />
@@ -1222,7 +1241,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filterPayslips(payslips, dashboardSearchQuery).map((payslip) => {
+              {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).map((payslip) => {
                 const calculatedPayslip = calculatePayslip(payslip);
                 return (
                   <tr key={payslip.id} className="hover:bg-gray-50 transition-colors">
@@ -1294,7 +1313,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                   </tr>
                 );
               })}
-              {filterPayslips(payslips, dashboardSearchQuery).length === 0 && payslips.length > 0 && dashboardSearchQuery && (
+              {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length === 0 && payslips.length > 0 && dashboardSearchQuery && (
                 <tr>
                   <td colSpan="8" className="px-3 py-8 text-center">
                     <div className="flex flex-col items-center">
@@ -1336,31 +1355,31 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         </div>
 
         {/* Table Footer with Summary */}
-        {filterPayslips(payslips, dashboardSearchQuery).length > 0 && (
+        {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length > 0 && (
           <div className="px-3 sm:px-4 py-3 border-t border-gray-200 bg-gray-50">
             <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center text-xs">
               <div className="text-gray-600">
-                {dashboardSearchQuery && filterPayslips(payslips, dashboardSearchQuery).length !== payslips.length ? (
-                  <span>{filterPayslips(payslips, dashboardSearchQuery).length} of {payslips.length} payslip{payslips.length !== 1 ? 's' : ''} • {payrollData.payPeriod}</span>
+                {dashboardSearchQuery && filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length !== (currentFilterPeriod ? filterPayslipsByPeriod(payslips, currentFilterPeriod).length : payslips.length) ? (
+                  <span>{filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length} of {currentFilterPeriod ? filterPayslipsByPeriod(payslips, currentFilterPeriod).length : payslips.length} payslip{(currentFilterPeriod ? filterPayslipsByPeriod(payslips, currentFilterPeriod).length : payslips.length) !== 1 ? 's' : ''} • {currentFilterPeriod || 'All Periods'}</span>
                 ) : (
-                  <span>{filterPayslips(payslips, dashboardSearchQuery).length} payslip{filterPayslips(payslips, dashboardSearchQuery).length !== 1 ? 's' : ''} • {payrollData.payPeriod}</span>
+                  <span>{filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length} payslip{filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length !== 1 ? 's' : ''} • {currentFilterPeriod || 'All Periods'}</span>
                 )}
               </div>
               <div className="flex flex-col xs:flex-row xs:items-center gap-2 xs:gap-4 text-gray-600">
                 <span>Total: <span className="font-semibold text-gray-900">
-                  {filterPayslips(payslips, dashboardSearchQuery).reduce((sum, payslip) => {
+                  {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).reduce((sum, payslip) => {
                     const calculatedPayslip = calculatePayslip(payslip);
                     return sum + calculatedPayslip.totalEarnings;
                   }, 0).toFixed(0)}
                 </span></span>
                 <span>Deductions: <span className="font-semibold text-red-600">
-                  {filterPayslips(payslips, dashboardSearchQuery).reduce((sum, payslip) => {
+                  {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).reduce((sum, payslip) => {
                     const calculatedPayslip = calculatePayslip(payslip);
                     return sum + calculatedPayslip.totalDeductions;
                   }, 0).toFixed(0)}
                 </span></span>
                 <span>Net: <span className="font-semibold text-green-600">
-                  {filterPayslips(payslips, dashboardSearchQuery).reduce((sum, payslip) => {
+                  {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).reduce((sum, payslip) => {
                     const calculatedPayslip = calculatePayslip(payslip);
                     return sum + calculatedPayslip.netPay;
                   }, 0).toFixed(0)}
@@ -1371,7 +1390,8 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   const renderAddPayslip = () => {
     const selectedEmployeeData = employeeDatabase.find(emp => emp.id === selectedEmployeeForPayslip);
@@ -1395,6 +1415,47 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Pay Period Selection */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Pay Period</label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Month & Year</label>
+              <select
+                value={payslipFormData.payPeriod}
+                onChange={(e) => setPayslipFormData({ ...payslipFormData, payPeriod: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {getCurrentYearMonths().map(period => (
+                  <option key={period} value={period}>{period}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Worked Days</label>
+              <input
+                type="number"
+                min="1"
+                max="31"
+                value={payslipFormData.workedDays}
+                onChange={(e) => setPayslipFormData({ ...payslipFormData, workedDays: parseInt(e.target.value) || 0 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Total Days</label>
+              <input
+                type="number"
+                min="1"
+                max="31"
+                value={payslipFormData.totalDays}
+                onChange={(e) => setPayslipFormData({ ...payslipFormData, totalDays: parseInt(e.target.value) || 0 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Employee Information Display */}
@@ -1655,46 +1716,56 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Employee Number:</span>
-                <span className="text-secondary-900">{selectedEmployee.id}</span>
+                <span className="text-secondary-900">{selectedEmployee.employeeId || selectedEmployee.id || selectedEmployee.employee?.id || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Date of Joining:</span>
-                <span className="text-secondary-900">{selectedEmployee.dateOfJoining}</span>
+                <span className="text-secondary-900">{selectedEmployee.dateOfJoining || selectedEmployee.employee?.dateOfJoining || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Pay Period:</span>
-                <span className="text-secondary-900">{payrollData.payPeriod}</span>
+                <span className="text-secondary-900">{selectedEmployee.payPeriod || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Worked Days:</span>
-                <span className="text-secondary-900">{payrollData.workedDays}</span>
+                <span className="text-secondary-900">{selectedEmployee.workedDays || selectedEmployee.totalDays || 'N/A'}</span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center">
+                <span className="font-semibold text-secondary-700 w-40">Total Days:</span>
+                <span className="text-secondary-900">{selectedEmployee.totalDays || 'N/A'}</span>
               </div>
             </div>
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Employee Name:</span>
-                <span className="text-secondary-900">{selectedEmployee.name}</span>
+                <span className="text-secondary-900">{selectedEmployee.name || selectedEmployee.employee?.name || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Gender:</span>
-                <span className="text-secondary-900">{selectedEmployee.gender}</span>
+                <span className="text-secondary-900">{selectedEmployee.gender || selectedEmployee.employee?.gender || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">NRC:</span>
-                <span className="text-secondary-900">{selectedEmployee.nrc}</span>
+                <span className="text-secondary-900">{selectedEmployee.nrc || selectedEmployee.employee?.nrc || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">SSN:</span>
-                <span className="text-secondary-900">{selectedEmployee.ssn}</span>
+                <span className="text-secondary-900">{selectedEmployee.ssn || selectedEmployee.employee?.ssn || 'N/A'}</span>
               </div>
             </div>
           </div>
 
-          <div className="mb-6">
+          <div className="mb-6 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center">
               <span className="font-semibold text-secondary-700 w-32">Designation:</span>
               <span className="inline-flex px-3 py-1 text-sm font-medium bg-primary-100 text-primary-800 rounded-full">
-                {selectedEmployee.designation}
+                {selectedEmployee.designation || selectedEmployee.employee?.designation || 'N/A'}
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center">
+              <span className="font-semibold text-secondary-700 w-32">Department:</span>
+              <span className="inline-flex px-3 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded-full">
+                {selectedEmployee.department || selectedEmployee.employee?.department || 'N/A'}
               </span>
             </div>
           </div>
@@ -1713,65 +1784,65 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               <tbody>
                 <tr className="border-b border-secondary-300 hover:bg-secondary-50">
                   <td className="border-r border-secondary-300 p-4">Basic</td>
-                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {selectedEmployee.basicPay.toFixed(2)}</td>
+                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {(selectedEmployee.basicPay || selectedEmployee.employee?.basicPay || 0).toFixed(2)}</td>
                   <td className="border-r border-secondary-300 p-4">NAPSA</td>
-                  <td className="p-4 font-medium">ZMW {selectedEmployee.deductions.napsa.toFixed(2)}</td>
+                  <td className="p-4 font-medium">ZMW {(selectedEmployee.deductions?.napsa || 0).toFixed(2)}</td>
                 </tr>
                 <tr className="border-b border-secondary-300 hover:bg-secondary-50">
                   <td className="border-r border-secondary-300 p-4">Transport Allowance</td>
-                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {selectedEmployee.transportAllowance.toFixed(2)}</td>
+                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {(selectedEmployee.transportAllowance || selectedEmployee.employee?.transportAllowance || 0).toFixed(2)}</td>
                   <td className="border-r border-secondary-300 p-4">NHIMA</td>
-                  <td className="p-4 font-medium">ZMW {selectedEmployee.deductions.nhima.toFixed(2)}</td>
+                  <td className="p-4 font-medium">ZMW {(selectedEmployee.deductions?.nhima || 0).toFixed(2)}</td>
                 </tr>
                 <tr className="border-b border-secondary-300 hover:bg-secondary-50">
                   <td className="border-r border-secondary-300 p-4">House Rent Allowance</td>
-                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {selectedEmployee.houseRentAllowance.toFixed(2)}</td>
+                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {(selectedEmployee.houseRentAllowance || 0).toFixed(2)}</td>
                   <td className="border-r border-secondary-300 p-4">Loan</td>
-                  <td className="p-4 font-medium">ZMW {selectedEmployee.deductions.loan.toFixed(2)}</td>
+                  <td className="p-4 font-medium">ZMW {(selectedEmployee.deductions?.loan || 0).toFixed(2)}</td>
                 </tr>
                 <tr className="border-b border-secondary-300 hover:bg-secondary-50">
                   <td className="border-r border-secondary-300 p-4">Meal Allowance</td>
-                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {selectedEmployee.mealAllowance > 0 ? selectedEmployee.mealAllowance.toFixed(2) : '-'}</td>
+                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {((selectedEmployee.mealAllowance || selectedEmployee.employee?.mealAllowance || 0) > 0 ? (selectedEmployee.mealAllowance || selectedEmployee.employee?.mealAllowance || 0).toFixed(2) : '0.00')}</td>
                   <td className="border-r border-secondary-300 p-4"></td>
                   <td className="p-4"></td>
                 </tr>
                 {/* Other Earnings */}
-                {selectedEmployee.otherEarnings && selectedEmployee.otherEarnings.map((earning, index) => (
+                {selectedEmployee.otherEarnings && selectedEmployee.otherEarnings.length > 0 && selectedEmployee.otherEarnings.map((earning, index) => (
                   <tr key={`earning-${index}`} className="border-b border-secondary-300 hover:bg-secondary-50">
-                    <td className="border-r border-secondary-300 p-4">{earning.name}</td>
-                    <td className="border-r border-secondary-300 p-4 font-medium">ZMW {earning.amount.toFixed(2)}</td>
+                    <td className="border-r border-secondary-300 p-4">{earning.name || 'Other Earning'}</td>
+                    <td className="border-r border-secondary-300 p-4 font-medium">ZMW {(earning.amount || 0).toFixed(2)}</td>
                     <td className="border-r border-secondary-300 p-4"></td>
                     <td className="p-4"></td>
                   </tr>
                 ))}
                 {/* Other Deductions */}
-                {selectedEmployee.otherDeductions && selectedEmployee.otherDeductions.map((deduction, index) => (
+                {selectedEmployee.otherDeductions && selectedEmployee.otherDeductions.length > 0 && selectedEmployee.otherDeductions.map((deduction, index) => (
                   <tr key={`deduction-${index}`} className="border-b border-secondary-300 hover:bg-secondary-50">
                     <td className="border-r border-secondary-300 p-4"></td>
                     <td className="border-r border-secondary-300 p-4"></td>
-                    <td className="border-r border-secondary-300 p-4">{deduction.name}</td>
-                    <td className="p-4 font-medium">ZMW {deduction.amount.toFixed(2)}</td>
+                    <td className="border-r border-secondary-300 p-4">{deduction.name || 'Other Deduction'}</td>
+                    <td className="p-4 font-medium">ZMW {(deduction.amount || 0).toFixed(2)}</td>
                   </tr>
                 ))}
                 <tr className="border-b-2 border-secondary-800 font-bold bg-secondary-100">
                   <td className="border-r border-secondary-800 p-4">Total Earnings</td>
-                  <td className="border-r border-secondary-800 p-4">ZMW {selectedEmployee.totalEarnings.toFixed(2)}</td>
+                  <td className="border-r border-secondary-800 p-4">ZMW {(selectedEmployee.totalEarnings || 0).toFixed(2)}</td>
                   <td className="border-r border-secondary-800 p-4">Total Deductions</td>
-                  <td className="p-4">ZMW {selectedEmployee.totalDeductions.toFixed(2)}</td>
+                  <td className="p-4">ZMW {(selectedEmployee.totalDeductions || 0).toFixed(2)}</td>
                 </tr>
                 <tr className="font-bold bg-success-50">
                   <td className="border-r border-secondary-800 p-4"></td>
                   <td className="border-r border-secondary-800 p-4"></td>
                   <td className="border-r border-secondary-800 p-4 text-success-700">Net Pay</td>
-                  <td className="p-4 text-success-700 text-lg">ZMW {selectedEmployee.netPay.toFixed(2)}</td>
+                  <td className="p-4 text-success-700 text-lg">ZMW {(selectedEmployee.netPay || 0).toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           <div className="text-center mb-8 p-6 bg-gradient-to-r from-success-50 to-success-100 rounded-2xl border border-success-200">
-            <p className="text-2xl lg:text-3xl font-bold text-success-700 mb-2">ZMW {selectedEmployee.netPay.toFixed(2)}</p>
-            <p className="text-sm text-secondary-600 italic">{numberToWords(selectedEmployee.netPay)}</p>
+            <p className="text-2xl lg:text-3xl font-bold text-success-700 mb-2">ZMW {(selectedEmployee.netPay || 0).toFixed(2)}</p>
+            <p className="text-sm text-secondary-600 italic">{numberToWords(selectedEmployee.netPay || 0)}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-8">
@@ -1795,7 +1866,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     // Calculate comprehensive wage bill analytics
     const wageBillAnalytics = () => {
       const payslipsByPeriod = payslips.reduce((acc, payslip) => {
-        const period = payslip.payrollPeriod;
+        const period = payslip.payPeriod;
         if (!acc[period]) {
           acc[period] = [];
         }
@@ -2438,7 +2509,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                         <tbody>
                           ${calculatedPayslips.map(payslip => `
                             <tr>
-                              <td>${payslip.payrollPeriod || 'N/A'}</td>
+                              <td>${payslip.payPeriod || 'N/A'}</td>
                               <td class="employee-name">${payslip.name}</td>
                               <td class="amount">ZMW ${payslip.basicPay.toFixed(2)}</td>
                               <td class="amount">ZMW ${(payslip.transportAllowance + payslip.houseRentAllowance + payslip.mealAllowance + (payslip.otherEarningsTotal || 0)).toFixed(2)}</td>
@@ -3020,7 +3091,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </div>
               {dataManagementPayslipSearch && (
                 <div className="mt-2 text-sm text-gray-600">
-                  Found {filterPayslips(payslips, dataManagementPayslipSearch).length} of {payslips.length} payslips
+                  Found {filterPayslips(payslips, dataManagementPayslipSearch, null).length} of {payslips.length} payslips
                 </div>
               )}
             </div>
@@ -3058,19 +3129,19 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                 {dataManagementPayslipSearch && (
                   <div>
                     <h5 className="text-sm font-medium text-gray-700 mb-2">
-                      Payslips ({filterPayslips(payslips, dataManagementPayslipSearch).length})
+                      Payslips ({filterPayslips(payslips, dataManagementPayslipSearch, null).length})
                     </h5>
-                    {filterPayslips(payslips, dataManagementPayslipSearch).length > 0 ? (
+                    {filterPayslips(payslips, dataManagementPayslipSearch, null).length > 0 ? (
                       <div className="space-y-1 max-h-32 overflow-y-auto">
-                        {filterPayslips(payslips, dataManagementPayslipSearch).slice(0, 5).map((payslip) => (
+                        {filterPayslips(payslips, dataManagementPayslipSearch, null).slice(0, 5).map((payslip) => (
                           <div key={payslip.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
                             <span className="font-medium">{payslip.name}</span>
                             <span className="text-gray-500">{payslip.payPeriod || payslip.payrollPeriod} • {payslip.designation}</span>
                           </div>
                         ))}
-                        {filterPayslips(payslips, dataManagementPayslipSearch).length > 5 && (
+                        {filterPayslips(payslips, dataManagementPayslipSearch, null).length > 5 && (
                           <div className="text-xs text-gray-500 text-center pt-1">
-                            ...and {filterPayslips(payslips, dataManagementPayslipSearch).length - 5} more
+                            ...and {filterPayslips(payslips, dataManagementPayslipSearch, null).length - 5} more
                           </div>
                         )}
                       </div>
