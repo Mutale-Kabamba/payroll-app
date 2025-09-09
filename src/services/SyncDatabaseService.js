@@ -86,41 +86,22 @@ class SyncDatabaseService {
     try {
       if (this.isOnline) {
         try {
+          // Get employees from cloud (Firebase) only
           const cloudEmployees = await this.cloudService.getEmployees();
-          // Only update local storage with cloud data if cloud has data OR local is empty
-          const localEmployees = this.localService.getEmployees();
+          console.log('Fetched employees from Firebase:', cloudEmployees);
+          
+          // Update local storage with cloud data for offline access
           if (cloudEmployees.length > 0) {
             this.localService.setEmployees(cloudEmployees);
-            return cloudEmployees;
-          } else if (localEmployees.length > 0) {
-            // Cloud is empty but local has data, use local and sync to cloud
-            try {
-              for (const employee of localEmployees) {
-                await this.cloudService.addEmployee(employee);
-              }
-            } catch (syncError) {
-              console.log('Failed to sync local employees to cloud:', syncError);
-            }
-            return localEmployees;
-          } else {
-            // Both cloud and local are empty, let local service initialize defaults
-            this.localService.initializeDatabase();
-            const initializedEmployees = this.localService.getEmployees();
-            // Try to sync initialized data to cloud
-            try {
-              for (const employee of initializedEmployees) {
-                await this.cloudService.addEmployee(employee);
-              }
-            } catch (syncError) {
-              console.log('Failed to sync initialized employees to cloud:', syncError);
-            }
-            return initializedEmployees;
           }
+          
+          return cloudEmployees; // Return Firebase data only, even if empty
         } catch (cloudError) {
           console.error('Cloud service error, falling back to local:', cloudError);
           return this.localService.getEmployees();
         }
       } else {
+        // When offline, return local data (which should be synced from Firebase)
         return this.localService.getEmployees();
       }
     } catch (error) {
@@ -263,9 +244,14 @@ class SyncDatabaseService {
     try {
       if (this.isOnline) {
         const cloudSettings = await this.cloudService.getPayrollSettings();
-        // Update local storage with cloud data
-        this.localService.setPayrollSettings(cloudSettings);
-        return cloudSettings;
+        // Only update local storage if cloud settings exist
+        if (cloudSettings) {
+          this.localService.setPayrollSettings(cloudSettings);
+          return cloudSettings;
+        } else {
+          // No settings in cloud, return default local settings
+          return this.localService.getPayrollSettings();
+        }
       } else {
         return this.localService.getPayrollSettings();
       }
@@ -418,9 +404,11 @@ class SyncDatabaseService {
     }
   }
 
-  // Initialize database
+  // Initialize database - no auto data creation
   initializeDatabase() {
-    return this.localService.initializeDatabase();
+    // No automatic initialization - system only shows Firebase data
+    console.log('SyncDatabaseService initialized - will only use Firebase data');
+    return true;
   }
 }
 
