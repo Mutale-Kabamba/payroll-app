@@ -1344,7 +1344,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
   );
 
   const renderAddPayslip = () => {
-    const selectedEmployeeData = employeeDatabase.find(emp => emp.id === newPayslip.employeeId);
+    const selectedEmployeeData = employeeDatabase.find(emp => emp.id === selectedEmployeeForPayslip);
 
     return (
       <div className="max-w-4xl mx-auto bg-white rounded border border-gray-300 shadow-sm p-6">
@@ -1354,8 +1354,8 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">Select Employee</label>
           <select
-            value={newPayslip.employeeId}
-            onChange={(e) => setNewPayslip({...newPayslip, employeeId: e.target.value})}
+            value={selectedEmployeeForPayslip}
+            onChange={(e) => setSelectedEmployeeForPayslip(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Choose an employee...</option>
@@ -1570,9 +1570,9 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         <div className="flex space-x-4 mt-6">
           <button
             onClick={addPayslip}
-            disabled={!newPayslip.employeeId}
+            disabled={!selectedEmployeeForPayslip}
             className={`px-6 py-2 rounded font-medium transition-colors ${
-              newPayslip.employeeId 
+              selectedEmployeeForPayslip 
                 ? 'bg-blue-600 text-white hover:bg-blue-700' 
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
