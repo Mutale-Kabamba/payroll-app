@@ -415,6 +415,17 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       const employee = employeeDatabase.find(emp => emp.id === selectedEmployeeForPayslip);
       if (!employee) {
         showError('Selected employee not found');
+        setIsCreatingPayslip(false);
+        return;
+      }
+
+      // Check if payslip already exists for this employee and pay period
+      const existingPayslip = payslips.find(p => 
+        p.employeeId === employee.id && p.payPeriod === payrollData.payPeriod
+      );
+      if (existingPayslip) {
+        showError(`Payslip already exists for ${employee.name} for ${payrollData.payPeriod}`);
+        setIsCreatingPayslip(false);
         return;
       }
 
@@ -952,7 +963,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                           
                           <div class="employee-info">
                             <div class="info-section">
-                              <div class="info-row"><span class="label">Employee Number:</span> <span class="value">${payslip.id}</span></div>
+                              <div class="info-row"><span class="label">Employee Number:</span> <span class="value">${payslip.employeeId}</span></div>
                               <div class="info-row"><span class="label">Date of Joining:</span> <span class="value">${payslip.dateOfJoining}</span></div>
                               <div class="info-row"><span class="label">Pay Period:</span> <span class="value">${payslip.payrollPeriod}</span></div>
                               <div class="info-row"><span class="label">Worked Days:</span> <span class="value">${payslip.workedDays || payrollData.workedDays}</span></div>
@@ -1058,7 +1069,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     </div>
                     <div className="ml-3 flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-900 truncate">{payslip.name}</div>
-                      <div className="text-xs text-gray-500">{payslip.id}</div>
+                      <div className="text-xs text-gray-500">{payslip.employeeId}</div>
                     </div>
                   </div>
                   <span className="inline-flex px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800 flex-shrink-0">
@@ -1214,7 +1225,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                         </div>
                         <div className="ml-2 min-w-0 flex-1">
                           <div className="text-sm font-medium text-gray-900 truncate">{payslip.name}</div>
-                          <div className="text-xs text-gray-500">{payslip.id}</div>
+                          <div className="text-xs text-gray-500">{payslip.employeeId}</div>
                         </div>
                       </div>
                     </td>
