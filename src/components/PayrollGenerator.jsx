@@ -64,6 +64,10 @@ useEffect(() => {
 
             // Load payslips from sync service
             console.log('📄 Loading payslips from sync service...');
+            
+            // Clean up any duplicate payslips first
+            await syncDatabaseService.cleanupDuplicatePayslips();
+            
             const savedPayslips = await syncDatabaseService.getPayslips();
             console.log('📊 Loaded payslips:', savedPayslips);
             console.log('📈 Payslips count:', savedPayslips.length);

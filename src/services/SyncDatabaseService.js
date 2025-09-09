@@ -244,6 +244,15 @@ class SyncDatabaseService {
     }
   }
 
+  async cleanupDuplicatePayslips() {
+    try {
+      return this.localService.cleanupDuplicatePayslips();
+    } catch (error) {
+      console.error('Error cleaning up duplicate payslips:', error);
+      return false;
+    }
+  }
+
   // SETTINGS METHODS
   async getPayrollSettings() {
     try {
