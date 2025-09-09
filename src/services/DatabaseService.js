@@ -2,20 +2,14 @@
 class DatabaseService {
   constructor() {
     this.storagePrefix = 'payroll_app_';
-    // Don't auto-initialize - let SyncDatabaseService control initialization
+    this.initializeDatabase();
   }
 
-  // Initialize database with default data only on first use (not when all employees are deleted)
+  // Initialize database with default data if it doesn't exist
   initializeDatabase() {
     const employees = this.getEmployees();
-    // Only initialize defaults if no employees exist AND no 'initialized' flag is set AND user hasn't deliberately cleared data
-    const hasBeenInitialized = localStorage.getItem(`${this.storagePrefix}initialized`);
-    const deliberatelyCleared = localStorage.getItem('payroll_app_deliberately_cleared');
-    
-    if (employees.length === 0 && !hasBeenInitialized && !deliberatelyCleared) {
+    if (employees.length === 0) {
       this.initializeDefaultEmployees();
-      // Set flag to prevent re-initialization when all employees are deleted
-      localStorage.setItem(`${this.storagePrefix}initialized`, 'true');
     }
   }
 
@@ -328,7 +322,6 @@ class DatabaseService {
     localStorage.removeItem(this.getStorageKey('employees'));
     localStorage.removeItem(this.getStorageKey('payslips'));
     localStorage.removeItem(this.getStorageKey('payroll_settings'));
-    // Don't remove the initialization flag here - let SyncDatabaseService handle it
   }
 
   // Get storage usage information

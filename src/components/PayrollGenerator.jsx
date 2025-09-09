@@ -16,9 +16,9 @@ const [payslips, setPayslips] = useState([]);
 
 const [currentView, setCurrentView] = useState('dashboard');
 const [selectedEmployee, setSelectedEmployee] = useState(null);
+const [selectedEmployeeForPayslip, setSelectedEmployeeForPayslip] = useState('');
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 const [showEmployeeForm, setShowEmployeeForm] = useState(false);
-const [editingEmployee, setEditingEmployee] = useState(null);
 
 // Search functionality
 const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
@@ -72,9 +72,6 @@ useEffect(() => {
                 workedDays: settings.workedDays || prevData.workedDays,
                 totalDays: settings.totalDays || prevData.totalDays
             }));
-            
-            // Initialize sync after data is loaded
-            await syncDatabaseService.initializeSync();
             
             setSyncStatus('synced');
         } catch (error) {
@@ -235,93 +232,6 @@ const handleDeleteEmployee = async (employeeId) => {
     );
 };
 
-const handleEditEmployee = (employee) => {
-    // Set the employee data for editing
-    setEditingEmployee(employee);
-    setNewEmployee({
-        id: employee.id,
-        name: employee.name,
-        nrc: employee.nrc || '',
-        ssn: employee.ssn || '',
-        gender: employee.gender || 'Male',
-        designation: employee.designation,
-        dateOfJoining: employee.dateOfJoining || '',
-        basicPay: employee.basicPay.toString(),
-        transportAllowance: employee.transportAllowance?.toString() || '0',
-        mealAllowance: employee.mealAllowance?.toString() || '0',
-        address: employee.address || '',
-        department: employee.department || '',
-        napsa: employee.napsa || '',
-        nhima: employee.nhima || ''
-    });
-    setShowEmployeeForm(true);
-};
-
-const handleUpdateEmployee = async () => {
-    if (!editingEmployee) {
-        showError('No employee selected for editing', 'Edit Error');
-        return;
-    }
-
-    if (!newEmployee.name.trim()) {
-        showError('Employee name is required', 'Validation Error');
-        return;
-    }
-
-    if (!newEmployee.designation.trim()) {
-        showError('Employee designation is required', 'Validation Error');
-        return;
-    }
-
-    try {
-        // Prepare updated employee data
-        const updatedEmployeeData = {
-            ...editingEmployee,
-            ...newEmployee,
-            basicPay: parseFloat(newEmployee.basicPay) || 0,
-            transportAllowance: parseFloat(newEmployee.transportAllowance) || 0,
-            mealAllowance: parseFloat(newEmployee.mealAllowance) || 0,
-            updatedAt: new Date().toISOString()
-        };
-
-        showLoading('Updating employee...');
-
-        // Update employee in database
-        await syncDatabaseService.updateEmployee(editingEmployee.id, updatedEmployeeData);
-        
-        // Update local state
-        const updatedEmployees = await syncDatabaseService.getEmployees();
-        setEmployeeDatabase(updatedEmployees);
-        
-        // Reset form
-        setNewEmployee({
-            id: '',
-            name: '',
-            nrc: '',
-            ssn: '',
-            gender: 'Male',
-            designation: '',
-            dateOfJoining: '',
-            basicPay: '',
-            transportAllowance: '',
-            mealAllowance: '',
-            address: '',
-            department: '',
-            napsa: '',
-            nhima: ''
-        });
-        
-        setEditingEmployee(null);
-        setShowEmployeeForm(false);
-        hideLoading();
-        showSuccess(`Employee ${updatedEmployeeData.name} has been updated successfully!`, 'Employee Updated');
-    } catch (error) {
-        hideLoading();
-        console.error('Error updating employee:', error);
-        showError(error.message || 'Failed to update employee', 'Update Employee Failed');
-    }
-};
-
 const handleBulkImportEmployees = async (event) => {
     const file = event.target.files[0];
     if (!file) {
@@ -447,45 +357,6 @@ const handleBulkImportEmployees = async (event) => {
     event.target.value = '';
   };
 
-  // Function to restore default employees
-  const handleRestoreDefaultEmployees = async () => {
-    showConfirm(
-      'This will add 7 default sample employees to your database. Existing employees will not be affected.',
-      'Restore Default Employees?',
-      async () => {
-        try {
-          showLoading('Restoring default employees...');
-          
-          // Temporarily allow initialization of defaults
-          localStorage.removeItem('payroll_app_deliberately_cleared');
-          
-          // Initialize with default employees
-          syncDatabaseService.localService.initializeDefaultEmployees();
-          
-          // Refresh the employee list
-          const updatedEmployees = await syncDatabaseService.getEmployees();
-          setEmployeeDatabase(updatedEmployees);
-          
-          hideLoading();
-          closeModal('confirm');
-          showSuccess('Default employees have been successfully added to your database.', 'Employees Restored');
-          
-        } catch (error) {
-          hideLoading();
-          closeModal('confirm');
-          console.error('Error restoring default employees:', error);
-          showError(`Failed to restore default employees: ${error.message}`, 'Restore Failed');
-        }
-      },
-      {
-        title: 'Restore Default Employees',
-        confirmText: 'Restore Employees',
-        cancelText: 'Cancel',
-        danger: false
-      }
-    );
-  };
-
   const [newPayslip, setNewPayslip] = useState({
     employeeId: '',
     otherEarnings: [],
@@ -521,14 +392,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
   };
 
   const addPayslip = async () => {
-    if (!newPayslip.employeeId) {
+    if (!selectedEmployeeForPayslip) {
       showError('Please select an employee');
       return;
     }
 
     try {
-      const employee = employeeDatabase.find(emp => emp.id === newPayslip.employeeId);
-      
+      const employee = employeeDatabase.find(emp => emp.id === selectedEmployeeForPayslip);
       if (!employee) {
         showError('Selected employee not found');
         return;
@@ -538,14 +408,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
       // Generate payslip with proper ID and flatten employee data for easier access
       const payslipId = `PS_${employee.id}_${Date.now()}`;
-      const payslipData = {
+      const newPayslip = {
         id: payslipId,
         // Employee info flattened for easier access in table
         employeeId: employee.id,
         name: employee.name,
         designation: employee.designation,
         nrc: employee.nrc,
-        ssn: employee.ssn || '', // Handle empty SSN
         // Payroll data
         payPeriod: payrollData.payPeriod,
         workedDays: payrollData.workedDays,
@@ -558,13 +427,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         // Keep full employee object for backward compatibility
         employee: employee,
         createdAt: new Date().toISOString(),
-        // Include other earnings and deductions from the form
-        otherEarnings: newPayslip.otherEarnings || [],
-        otherDeductions: newPayslip.otherDeductions || []
+        // Initialize other earnings and deductions as empty arrays
+        otherEarnings: [],
+        otherDeductions: []
       };
 
       // Save to database
-      await syncDatabaseService.addPayslip(payslipData);
+      await syncDatabaseService.addPayslip(newPayslip);
       
       // Update local state
       const updatedPayslips = await syncDatabaseService.getPayslips();
@@ -572,15 +441,11 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
       hideLoading();
       showSuccess(`Payslip generated successfully for ${employee.name}!`);
-      setNewPayslip({
-        employeeId: '',
-        otherEarnings: [],
-        otherDeductions: []
-      });
+      setSelectedEmployeeForPayslip('');
     } catch (error) {
       console.error('Error generating payslip:', error);
       hideLoading();
-      showError(`Failed to generate payslip: ${error.message}`);
+      showError('Failed to generate payslip');
     }
   };
 
@@ -646,20 +511,12 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           await syncDatabaseService.deletePayslip(payslipId);
           console.log('Successfully deleted from database');
           
-          // Immediately remove from local state
-          setPayslips(prevPayslips => prevPayslips.filter(p => p.id !== payslipId));
-          
-          // Wait a moment for the deletion to propagate
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Clear local storage completely to force fresh fetch
-          localStorage.removeItem('payroll_app_payslips');
-          console.log('Cleared local payslips cache');
-          
-          // Refresh payslips from cloud to ensure deleted ones don't come back
-          const updatedPayslips = await syncDatabaseService.getPayslips();
-          console.log('Refreshed payslips from database:', updatedPayslips);
-          setPayslips(updatedPayslips);
+          // Immediately update local state to reflect the change
+          setPayslips(prevPayslips => {
+            const filtered = prevPayslips.filter(p => p.id !== payslipId);
+            console.log('Updated payslips after delete:', filtered);
+            return filtered;
+          });
           
           hideLoading();
           closeModal('confirm');
@@ -2716,16 +2573,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               try {
                 await syncDatabaseService.clearAllData();
                 
-                // Reset to empty state (don't reinitialize with defaults)
-                setEmployeeDatabase([]);
-                setPayslips([]);
-                setPayrollData({
-                  payPeriod: 'September 2025',
-                  workedDays: 22,
-                  totalDays: 22
-                });
+                // Reset to initial state
+                syncDatabaseService.initializeDatabase();
+                setEmployeeDatabase(await syncDatabaseService.getEmployees());
+                setPayslips(await syncDatabaseService.getPayslips());
+                setPayrollData(await syncDatabaseService.getPayrollSettings());
                 
-                showSuccess('All data has been cleared successfully. The system has been reset to an empty state.', 'Data Cleared');
+                showSuccess('All data has been cleared successfully. The system has been reset to its default state.', 'Data Cleared');
                 closeModal('confirm');
               } catch (error) {
                 console.error('Error clearing data:', error);
@@ -2765,14 +2619,6 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               Employee Management
             </h3>
             <div className="flex gap-3">
-              <button
-                onClick={handleRestoreDefaultEmployees}
-                className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors flex items-center gap-2"
-                title="Restore 7 sample employees"
-              >
-                <Users className="h-4 w-4" />
-                Restore Defaults
-              </button>
               <label className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors flex items-center gap-2 cursor-pointer">
                 <Upload className="h-4 w-4" />
                 Bulk Import
@@ -2793,12 +2639,10 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             </div>
           </div>
 
-          {/* Add/Edit Employee Form */}
+          {/* Add Employee Form */}
           {showEmployeeForm && (
             <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
-              <h4 className="font-semibold text-gray-800 mb-4">
-                {editingEmployee ? 'Edit Employee' : 'Add New Employee'}
-              </h4>
+              <h4 className="font-semibold text-gray-800 mb-4">Add New Employee</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID *</label>
@@ -2808,7 +2652,6 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     onChange={(e) => setNewEmployee({...newEmployee, id: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="e.g., EMP001"
-                    disabled={editingEmployee} // Disable ID editing when editing existing employee
                   />
                 </div>
                 <div>
@@ -2927,36 +2770,16 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </div>
               <div className="mt-4 flex justify-end gap-3">
                 <button
-                  onClick={() => {
-                    setShowEmployeeForm(false);
-                    setEditingEmployee(null);
-                    // Reset form when canceling
-                    setNewEmployee({
-                      id: '',
-                      name: '',
-                      nrc: '',
-                      ssn: '',
-                      gender: 'Male',
-                      designation: '',
-                      dateOfJoining: '',
-                      basicPay: '',
-                      transportAllowance: '',
-                      mealAllowance: '',
-                      address: '',
-                      department: '',
-                      napsa: '',
-                      nhima: ''
-                    });
-                  }}
+                  onClick={() => setShowEmployeeForm(false)}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={editingEmployee ? handleUpdateEmployee : handleAddEmployee}
+                  onClick={handleAddEmployee}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
-                  {editingEmployee ? 'Update Employee' : 'Add Employee'}
+                  Add Employee
                 </button>
               </div>
             </div>
@@ -2999,22 +2822,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{employee.designation}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">ZMW {employee.basicPay.toFixed(2)}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-sm">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEditEmployee(employee)}
-                          className="text-blue-600 hover:text-blue-900 transition-colors"
-                          title="Edit Employee"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteEmployee(employee.id)}
-                          className="text-red-600 hover:text-red-900 transition-colors"
-                          title="Delete Employee"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleDeleteEmployee(employee.id)}
+                        className="text-red-600 hover:text-red-900 transition-colors"
+                        title="Delete Employee"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
