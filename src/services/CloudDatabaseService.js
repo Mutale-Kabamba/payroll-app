@@ -33,6 +33,48 @@ class CloudDatabaseService {
     return docId ? `${basePath}/${docId}` : basePath;
   }
 
+  // Test Firebase connection and permissions
+  async testFirebaseConnection() {
+    try {
+      console.log('Testing Firebase connection and permissions...');
+      const testDoc = doc(db, this.getCompanyDocPath('test'), 'connection-test');
+      
+      // Try to write a test document
+      await setDoc(testDoc, { 
+        test: true, 
+        timestamp: new Date().toISOString(),
+        operation: 'connection-test'
+      });
+      console.log('✓ Firebase write permission verified');
+      
+      // Try to read the test document
+      const readSnapshot = await getDoc(testDoc);
+      if (readSnapshot.exists()) {
+        console.log('✓ Firebase read permission verified');
+      } else {
+        throw new Error('Failed to read test document');
+      }
+      
+      // Try to delete the test document
+      await deleteDoc(testDoc);
+      console.log('✓ Firebase delete permission verified');
+      
+      // Verify deletion
+      const verifySnapshot = await getDoc(testDoc);
+      if (!verifySnapshot.exists()) {
+        console.log('✓ Firebase delete operation verified');
+      } else {
+        throw new Error('Test document still exists after deletion');
+      }
+      
+      console.log('✓ All Firebase operations working correctly');
+      return true;
+    } catch (error) {
+      console.error('❌ Firebase connection/permission test failed:', error);
+      return false;
+    }
+  }
+
   // EMPLOYEE MANAGEMENT
   async getEmployees() {
     try {
@@ -84,16 +126,58 @@ class CloudDatabaseService {
 
   async deleteEmployee(employeeId) {
     try {
-      const employeeRef = doc(db, this.getCompanyDocPath('employees'), employeeId);
+      console.log(`Attempting to delete employee from Firebase: ${employeeId}`);
+      const docPath = this.getCompanyDocPath('employees');
+      console.log(`Employee collection path: ${docPath}`);
+      const employeeRef = doc(db, docPath, employeeId);
+      console.log(`Full employee document path: ${docPath}/${employeeId}`);
+      
+      // Verify document exists before deletion
+      const docSnapshot = await getDoc(employeeRef);
+      if (!docSnapshot.exists()) {
+        console.log(`Employee ${employeeId} does not exist in Firebase, skipping deletion`);
+        this.deleteLocalEmployee(employeeId);
+        return true;
+      }
+      
+      console.log(`Employee ${employeeId} exists in Firebase, proceeding with deletion`);
       await deleteDoc(employeeRef);
+      console.log(`Successfully deleted employee from Firebase: ${employeeId}`);
+      
+      // Verify deletion by checking if document still exists
+      const verifySnapshot = await getDoc(employeeRef);
+      if (verifySnapshot.exists()) {
+        throw new Error(`Employee ${employeeId} still exists after deletion attempt`);
+      }
+      console.log(`Verified: Employee ${employeeId} successfully removed from Firebase`);
       
       // Also delete from localStorage
       this.deleteLocalEmployee(employeeId);
       return true;
     } catch (error) {
-      console.error('Error deleting employee:', error);
+      console.error('Error deleting employee from Firebase:', error);
+      console.error('Falling back to local delete only');
       return this.deleteLocalEmployee(employeeId);
     }
+  }
+
+  // Batch delete employees
+  async deleteEmployeesBatch(employeeIds) {
+    const results = [];
+    console.log(`Starting batch deletion of ${employeeIds.length} employees`);
+    
+    for (const employeeId of employeeIds) {
+      try {
+        const result = await this.deleteEmployee(employeeId);
+        results.push({ id: employeeId, success: result });
+      } catch (error) {
+        console.error(`Failed to delete employee ${employeeId}:`, error);
+        results.push({ id: employeeId, success: false, error: error.message });
+      }
+    }
+    
+    console.log(`Batch deletion completed. Results:`, results);
+    return results;
   }
 
   // PAYSLIP MANAGEMENT
@@ -129,16 +213,64 @@ class CloudDatabaseService {
 
   async deletePayslip(payslipId) {
     try {
-      const payslipRef = doc(db, this.getCompanyDocPath('payslips'), payslipId);
+      console.log(`🗑️ CloudDatabaseService: Attempting to delete payslip from Firebase: ${payslipId}`);
+      const docPath = this.getCompanyDocPath('payslips');
+      console.log(`📁 Payslip collection path: ${docPath}`);
+      const payslipRef = doc(db, docPath, payslipId);
+      console.log(`📄 Full payslip document path: ${docPath}/${payslipId}`);
+      
+      // Verify document exists before deletion
+      const docSnapshot = await getDoc(payslipRef);
+      if (!docSnapshot.exists()) {
+        console.log(`❌ Payslip ${payslipId} does not exist in Firebase, skipping deletion`);
+        this.deleteLocalPayslip(payslipId);
+        return true;
+      }
+      
+      console.log(`✅ Payslip ${payslipId} exists in Firebase, proceeding with deletion`);
+      console.log(`🧾 Payslip data:`, docSnapshot.data());
+      
       await deleteDoc(payslipRef);
+      console.log(`🔥 Firebase deleteDoc() called for payslip: ${payslipId}`);
+      
+      // Verify deletion by checking if document still exists
+      const verifySnapshot = await getDoc(payslipRef);
+      if (verifySnapshot.exists()) {
+        console.error(`❌ ERROR: Payslip ${payslipId} still exists after deletion attempt!`);
+        console.error('Verification data:', verifySnapshot.data());
+        throw new Error(`Payslip ${payslipId} still exists after deletion attempt`);
+      }
+      console.log(`✅ VERIFIED: Payslip ${payslipId} successfully removed from Firebase`);
       
       // Also delete from localStorage
       this.deleteLocalPayslip(payslipId);
+      console.log(`🗑️ Local payslip ${payslipId} also deleted`);
       return true;
     } catch (error) {
-      console.error('Error deleting payslip:', error);
+      console.error('❌ Error deleting payslip from Firebase:', error);
+      console.error('❌ Error stack:', error.stack);
+      console.error('❌ Falling back to local delete only');
       return this.deleteLocalPayslip(payslipId);
     }
+  }
+
+  // Batch delete payslips
+  async deletePayslipsBatch(payslipIds) {
+    const results = [];
+    console.log(`Starting batch deletion of ${payslipIds.length} payslips`);
+    
+    for (const payslipId of payslipIds) {
+      try {
+        const result = await this.deletePayslip(payslipId);
+        results.push({ id: payslipId, success: result });
+      } catch (error) {
+        console.error(`Failed to delete payslip ${payslipId}:`, error);
+        results.push({ id: payslipId, success: false, error: error.message });
+      }
+    }
+    
+    console.log(`Batch deletion completed. Results:`, results);
+    return results;
   }
 
   // SETTINGS MANAGEMENT
@@ -285,16 +417,43 @@ class CloudDatabaseService {
   // SYNC METHODS
   async syncLocalToCloud() {
     try {
+      console.log('Starting sync from local to cloud...');
+      
       // Sync employees
       const localEmployees = this.getLocalEmployees();
+      console.log(`Syncing ${localEmployees.length} employees to cloud`);
       for (const employee of localEmployees) {
-        await this.addEmployee(employee);
+        try {
+          await this.addEmployee(employee);
+        } catch (error) {
+          console.log(`Failed to sync employee ${employee.id}:`, error.message);
+        }
       }
 
-      // Sync payslips
+      // Sync payslips - but first check what's already in cloud to avoid duplicates
       const localPayslips = this.getLocalPayslips();
+      console.log(`Syncing ${localPayslips.length} payslips to cloud`);
+      
+      let cloudPayslips = [];
+      try {
+        cloudPayslips = await this.getPayslips();
+      } catch (error) {
+        console.log('Could not fetch cloud payslips for comparison:', error.message);
+      }
+      
+      const cloudPayslipIds = new Set(cloudPayslips.map(p => p.id));
+      
       for (const payslip of localPayslips) {
-        await this.addPayslip(payslip);
+        try {
+          if (!cloudPayslipIds.has(payslip.id)) {
+            await this.addPayslip(payslip);
+            console.log(`Synced payslip ${payslip.id} to cloud`);
+          } else {
+            console.log(`Payslip ${payslip.id} already exists in cloud, skipping`);
+          }
+        } catch (error) {
+          console.log(`Failed to sync payslip ${payslip.id}:`, error.message);
+        }
       }
 
       // Sync settings
