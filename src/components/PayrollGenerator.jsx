@@ -19,6 +19,7 @@ const [selectedEmployee, setSelectedEmployee] = useState(null);
 const [selectedEmployeeForPayslip, setSelectedEmployeeForPayslip] = useState('');
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+const [isCreatingPayslip, setIsCreatingPayslip] = useState(false);
 
 // Search functionality
 const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
@@ -404,6 +405,12 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       return;
     }
 
+    if (isCreatingPayslip) {
+      return; // Prevent double clicks
+    }
+
+    setIsCreatingPayslip(true);
+
     try {
       const employee = employeeDatabase.find(emp => emp.id === selectedEmployeeForPayslip);
       if (!employee) {
@@ -449,10 +456,12 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       hideLoading();
       showSuccess(`Payslip generated successfully for ${employee.name}!`);
       setSelectedEmployeeForPayslip('');
+      setIsCreatingPayslip(false);
     } catch (error) {
       console.error('Error generating payslip:', error);
       hideLoading();
       showError('Failed to generate payslip');
+      setIsCreatingPayslip(false);
     }
   };
 
@@ -1570,14 +1579,14 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         <div className="flex space-x-4 mt-6">
           <button
             onClick={addPayslip}
-            disabled={!selectedEmployeeForPayslip}
+            disabled={!selectedEmployeeForPayslip || isCreatingPayslip}
             className={`px-6 py-2 rounded font-medium transition-colors ${
-              selectedEmployeeForPayslip 
+              selectedEmployeeForPayslip && !isCreatingPayslip
                 ? 'bg-blue-600 text-white hover:bg-blue-700' 
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
-            Create Payslip
+            {isCreatingPayslip ? 'Creating...' : 'Create Payslip'}
           </button>
           <button
             onClick={() => setCurrentView('dashboard')}
