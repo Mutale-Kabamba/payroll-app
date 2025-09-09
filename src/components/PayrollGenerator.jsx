@@ -610,6 +610,248 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     setCurrentView('payslip');
   };
 
+  const printSinglePayslip = (payslipData) => {
+    const calculatedPayslip = calculatePayslip(payslipData);
+    const printWindow = window.open('', '_blank');
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Payslip - ${payslipData.name} - ${payslipData.payPeriod}</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 15mm 15mm 15mm 15mm;
+          }
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            font-size: 12px;
+            line-height: 1.4;
+            color: #000;
+          }
+          .payslip { 
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 10mm 0;
+          }
+          .header { 
+            text-align: center; 
+            margin-bottom: 20px; 
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+          }
+          .company-name { 
+            font-size: 18px; 
+            font-weight: bold; 
+            margin-bottom: 3px; 
+            letter-spacing: 1px;
+          }
+          .company-address { 
+            font-size: 11px; 
+            color: #333; 
+            margin-bottom: 5px;
+          }
+          .payslip-title { 
+            font-size: 16px; 
+            font-weight: bold; 
+            margin: 15px 0; 
+            text-align: center;
+            text-decoration: underline;
+          }
+          .employee-info { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background-color: #f9f9f9;
+          }
+          .info-section { width: 48%; }
+          .info-row { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 4px;
+            font-size: 11px;
+          }
+          .label { 
+            font-weight: bold; 
+            width: 45%;
+          }
+          .value {
+            width: 55%;
+            text-align: left;
+          }
+          .designation-department {
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 8px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+          }
+          .designation-department span {
+            display: inline-block;
+            margin: 0 10px;
+            padding: 3px 8px;
+            background-color: #e0e0e0;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+          }
+          .earnings-deductions { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-top: 15px;
+            flex: 1;
+          }
+          .earnings, .deductions { 
+            width: 48%; 
+            border: 1px solid #333;
+            padding: 10px;
+          }
+          .section-title { 
+            font-weight: bold; 
+            font-size: 14px; 
+            margin-bottom: 8px;
+            text-align: center;
+            background-color: #e0e0e0;
+            padding: 5px;
+            margin: -10px -10px 10px -10px;
+          }
+          .amount-row { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 3px;
+            font-size: 11px;
+            padding: 2px 0;
+          }
+          .total-row { 
+            border-top: 2px solid #000; 
+            padding-top: 5px; 
+            margin-top: 8px; 
+            font-weight: bold;
+            font-size: 12px;
+          }
+          .net-pay { 
+            text-align: center; 
+            margin-top: 15px; 
+            padding: 8px; 
+            background-color: #f0f0f0; 
+            font-size: 16px; 
+            font-weight: bold;
+            border: 2px solid #000;
+          }
+          .amount-words { 
+            margin-top: 10px; 
+            font-style: italic;
+            font-size: 11px;
+            text-align: center;
+            padding: 5px;
+            border: 1px dashed #666;
+          }
+          .footer {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            border-top: 1px solid #ccc;
+            padding-top: 5px;
+          }
+          @media print {
+            body { 
+              margin: 0;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .payslip { 
+              height: auto;
+              min-height: 90vh;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="payslip">
+          <div class="header">
+            <div class="company-name">SPF & CM ENTERPRISES LIMITED</div>
+            <div class="company-address">2670 Town Area, Senanga Rd.</div>
+          </div>
+          
+          <div class="payslip-title">Payslip</div>
+          
+          <div class="employee-info">
+            <div class="info-section">
+              <div class="info-row"><span class="label">Employee Number:</span> <span class="value">${payslipData.employeeId || payslipData.id || payslipData.employee?.id || 'N/A'}</span></div>
+              <div class="info-row"><span class="label">Date of Joining:</span> <span class="value">${payslipData.dateOfJoining || payslipData.employee?.dateOfJoining || 'N/A'}</span></div>
+              <div class="info-row"><span class="label">Pay Period:</span> <span class="value">${payslipData.payPeriod || 'N/A'}</span></div>
+              <div class="info-row"><span class="label">Worked Days:</span> <span class="value">${payslipData.workedDays || payslipData.totalDays || 'N/A'}</span></div>
+              <div class="info-row"><span class="label">Total Days:</span> <span class="value">${payslipData.totalDays || 'N/A'}</span></div>
+            </div>
+            <div class="info-section">
+              <div class="info-row"><span class="label">Employee Name:</span> <span class="value">${payslipData.name || payslipData.employee?.name || 'N/A'}</span></div>
+              <div class="info-row"><span class="label">Gender:</span> <span class="value">${payslipData.gender || payslipData.employee?.gender || 'N/A'}</span></div>
+              <div class="info-row"><span class="label">NRC:</span> <span class="value">${payslipData.nrc || payslipData.employee?.nrc || 'N/A'}</span></div>
+              <div class="info-row"><span class="label">SSN:</span> <span class="value">${payslipData.ssn || payslipData.employee?.ssn || 'N/A'}</span></div>
+            </div>
+          </div>
+          
+          <div class="designation-department">
+            <span>Designation: ${payslipData.designation || payslipData.employee?.designation || 'N/A'}</span>
+            <span>Department: ${payslipData.department || payslipData.employee?.department || 'N/A'}</span>
+          </div>
+          
+          <div class="earnings-deductions">
+            <div class="earnings">
+              <div class="section-title">Earnings</div>
+              <div class="amount-row"><span>Basic</span> <span>ZMW ${(payslipData.basicPay || payslipData.employee?.basicPay || 0).toFixed(2)}</span></div>
+              <div class="amount-row"><span>Transport Allowance</span> <span>ZMW ${(payslipData.transportAllowance || payslipData.employee?.transportAllowance || 0).toFixed(2)}</span></div>
+              <div class="amount-row"><span>House Rent Allowance</span> <span>ZMW ${(calculatedPayslip.houseRentAllowance || 0).toFixed(2)}</span></div>
+              <div class="amount-row"><span>Meal Allowance</span> <span>ZMW ${(payslipData.mealAllowance || payslipData.employee?.mealAllowance || 0).toFixed(2)}</span></div>
+              ${(payslipData.otherEarnings || []).map(earning => 
+                `<div class="amount-row"><span>${earning.name || 'Other Earning'}</span> <span>ZMW ${(earning.amount || 0).toFixed(2)}</span></div>`
+              ).join('')}
+              <div class="amount-row total-row"><span>Total Earnings</span> <span>ZMW ${(calculatedPayslip.totalEarnings || 0).toFixed(2)}</span></div>
+            </div>
+            
+            <div class="deductions">
+              <div class="section-title">Deductions</div>
+              <div class="amount-row"><span>NAPSA</span> <span>ZMW ${(calculatedPayslip.deductions?.napsa || 0).toFixed(2)}</span></div>
+              <div class="amount-row"><span>NHIMA</span> <span>ZMW ${(calculatedPayslip.deductions?.nhima || 0).toFixed(2)}</span></div>
+              <div class="amount-row"><span>Loan</span> <span>ZMW ${(calculatedPayslip.deductions?.loan || 0).toFixed(2)}</span></div>
+              ${(payslipData.otherDeductions || []).map(deduction => 
+                `<div class="amount-row"><span>${deduction.name || 'Other Deduction'}</span> <span>ZMW ${(deduction.amount || 0).toFixed(2)}</span></div>`
+              ).join('')}
+              <div class="amount-row total-row"><span>Total Deductions</span> <span>ZMW ${(calculatedPayslip.totalDeductions || 0).toFixed(2)}</span></div>
+            </div>
+          </div>
+          
+          <div class="net-pay">
+            Net Pay: ZMW ${(calculatedPayslip.netPay || 0).toFixed(2)}
+          </div>
+          
+          <div class="amount-words">
+            Amount in words: ${numberToWords(calculatedPayslip.netPay || 0)}
+          </div>
+          
+          <div class="footer">
+            Generated on ${new Date().toLocaleDateString()} | This is system generated payslip
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   const numberToWords = (num) => {
     const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
     const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -992,51 +1234,53 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                           
                           <div class="employee-info">
                             <div class="info-section">
-                              <div class="info-row"><span class="label">Employee Number:</span> <span class="value">${payslip.employeeId}</span></div>
-                              <div class="info-row"><span class="label">Date of Joining:</span> <span class="value">${payslip.dateOfJoining}</span></div>
-                              <div class="info-row"><span class="label">Pay Period:</span> <span class="value">${payslip.payPeriod}</span></div>
-                              <div class="info-row"><span class="label">Worked Days:</span> <span class="value">${payslip.workedDays || payrollData.workedDays}</span></div>
-                              <div class="info-row"><span class="label">Designation:</span> <span class="value">${payslip.designation}</span></div>
+                              <div class="info-row"><span class="label">Employee Number:</span> <span class="value">${payslip.employeeId || payslip.id || payslip.employee?.id || 'N/A'}</span></div>
+                              <div class="info-row"><span class="label">Date of Joining:</span> <span class="value">${payslip.dateOfJoining || payslip.employee?.dateOfJoining || 'N/A'}</span></div>
+                              <div class="info-row"><span class="label">Pay Period:</span> <span class="value">${payslip.payPeriod || 'N/A'}</span></div>
+                              <div class="info-row"><span class="label">Worked Days:</span> <span class="value">${payslip.workedDays || payslip.totalDays || 'N/A'}</span></div>
+                              <div class="info-row"><span class="label">Total Days:</span> <span class="value">${payslip.totalDays || 'N/A'}</span></div>
+                              <div class="info-row"><span class="label">Designation:</span> <span class="value">${payslip.designation || payslip.employee?.designation || 'N/A'}</span></div>
                             </div>
                             <div class="info-section">
-                              <div class="info-row"><span class="label">Employee Name:</span> <span class="value">${payslip.name}</span></div>
-                              <div class="info-row"><span class="label">Gender:</span> <span class="value">${payslip.gender}</span></div>
-                              <div class="info-row"><span class="label">NRC:</span> <span class="value">${payslip.nrc}</span></div>
-                              <div class="info-row"><span class="label">SSN:</span> <span class="value">${payslip.ssn}</span></div>
+                              <div class="info-row"><span class="label">Employee Name:</span> <span class="value">${payslip.name || payslip.employee?.name || 'N/A'}</span></div>
+                              <div class="info-row"><span class="label">Gender:</span> <span class="value">${payslip.gender || payslip.employee?.gender || 'N/A'}</span></div>
+                              <div class="info-row"><span class="label">NRC:</span> <span class="value">${payslip.nrc || payslip.employee?.nrc || 'N/A'}</span></div>
+                              <div class="info-row"><span class="label">SSN:</span> <span class="value">${payslip.ssn || payslip.employee?.ssn || 'N/A'}</span></div>
+                              <div class="info-row"><span class="label">Department:</span> <span class="value">${payslip.department || payslip.employee?.department || 'N/A'}</span></div>
                             </div>
                           </div>
                           
                           <div class="earnings-deductions">
                             <div class="earnings">
                               <div class="section-title">Earnings</div>
-                              <div class="amount-row"><span>Basic</span> <span>ZMW ${payslip.basicPay.toFixed(2)}</span></div>
-                              <div class="amount-row"><span>Transport Allowance</span> <span>ZMW ${payslip.transportAllowance.toFixed(2)}</span></div>
-                              <div class="amount-row"><span>House Rent Allowance</span> <span>ZMW ${calculatedPayslip.houseRentAllowance.toFixed(2)}</span></div>
-                              <div class="amount-row"><span>Meal Allowance</span> <span>ZMW ${payslip.mealAllowance.toFixed(2)}</span></div>
+                              <div class="amount-row"><span>Basic</span> <span>ZMW ${(payslip.basicPay || payslip.employee?.basicPay || 0).toFixed(2)}</span></div>
+                              <div class="amount-row"><span>Transport Allowance</span> <span>ZMW ${(payslip.transportAllowance || payslip.employee?.transportAllowance || 0).toFixed(2)}</span></div>
+                              <div class="amount-row"><span>House Rent Allowance</span> <span>ZMW ${(calculatedPayslip.houseRentAllowance || 0).toFixed(2)}</span></div>
+                              <div class="amount-row"><span>Meal Allowance</span> <span>ZMW ${(payslip.mealAllowance || payslip.employee?.mealAllowance || 0).toFixed(2)}</span></div>
                               ${(payslip.otherEarnings || []).map(earning => 
-                                `<div class="amount-row"><span>${earning.name}</span> <span>ZMW ${earning.amount.toFixed(2)}</span></div>`
+                                `<div class="amount-row"><span>${earning.name || 'Other Earning'}</span> <span>ZMW ${(earning.amount || 0).toFixed(2)}</span></div>`
                               ).join('')}
-                              <div class="amount-row total-row"><span>Total Earnings</span> <span>ZMW ${calculatedPayslip.totalEarnings.toFixed(2)}</span></div>
+                              <div class="amount-row total-row"><span>Total Earnings</span> <span>ZMW ${(calculatedPayslip.totalEarnings || 0).toFixed(2)}</span></div>
                             </div>
                             
                             <div class="deductions">
                               <div class="section-title">Deductions</div>
-                              <div class="amount-row"><span>NAPSA</span> <span>ZMW ${calculatedPayslip.deductions.napsa.toFixed(2)}</span></div>
-                              <div class="amount-row"><span>NHIMA</span> <span>ZMW ${calculatedPayslip.deductions.nhima.toFixed(2)}</span></div>
-                              <div class="amount-row"><span>Loan</span> <span>ZMW ${calculatedPayslip.deductions.loan.toFixed(2)}</span></div>
+                              <div class="amount-row"><span>NAPSA</span> <span>ZMW ${(calculatedPayslip.deductions?.napsa || 0).toFixed(2)}</span></div>
+                              <div class="amount-row"><span>NHIMA</span> <span>ZMW ${(calculatedPayslip.deductions?.nhima || 0).toFixed(2)}</span></div>
+                              <div class="amount-row"><span>Loan</span> <span>ZMW ${(calculatedPayslip.deductions?.loan || 0).toFixed(2)}</span></div>
                               ${(payslip.otherDeductions || []).map(deduction => 
-                                `<div class="amount-row"><span>${deduction.name}</span> <span>ZMW ${deduction.amount.toFixed(2)}</span></div>`
+                                `<div class="amount-row"><span>${deduction.name || 'Other Deduction'}</span> <span>ZMW ${(deduction.amount || 0).toFixed(2)}</span></div>`
                               ).join('')}
-                              <div class="amount-row total-row"><span>Total Deductions</span> <span>ZMW ${calculatedPayslip.totalDeductions.toFixed(2)}</span></div>
+                              <div class="amount-row total-row"><span>Total Deductions</span> <span>ZMW ${(calculatedPayslip.totalDeductions || 0).toFixed(2)}</span></div>
                             </div>
                           </div>
                           
                           <div class="net-pay">
-                            Net Pay: ZMW ${calculatedPayslip.netPay.toFixed(2)}
+                            Net Pay: ZMW ${(calculatedPayslip.netPay || 0).toFixed(2)}
                           </div>
                           
                           <div class="amount-words">
-                            Amount in words: ${numberToWords(calculatedPayslip.netPay)}
+                            Amount in words: ${numberToWords(calculatedPayslip.netPay || 0)}
                           </div>
                           
                           <div class="footer">
@@ -1697,7 +1941,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             ← Back to Dashboard
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={() => printSinglePayslip(selectedEmployee)}
             className="btn-primary flex items-center gap-2"
           >
             <Download className="h-5 w-5" />
