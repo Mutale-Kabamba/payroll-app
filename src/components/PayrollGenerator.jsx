@@ -24,6 +24,47 @@ const formatCurrency = (amount) => {
   return `${symbol} ${parseFloat(amount || 0).toFixed(2)}`;
 };
 
+// CSV parsing helper function for employee data
+const parseCSVEmployees = (csvText) => {
+  const lines = csvText.trim().split('\n');
+  if (lines.length < 2) return [];
+  
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const employees = [];
+  
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(',').map(v => v.trim());
+    if (values.length !== headers.length) continue;
+    
+    const employee = {};
+    headers.forEach((header, index) => {
+      employee[header] = values[index];
+    });
+    
+    // Validate required fields
+    if (employee.name && employee.id && employee.basicpay && employee.designation) {
+      employees.push({
+        id: employee.id,
+        name: employee.name,
+        nrc: employee.nrc || '',
+        ssn: employee.ssn || '',
+        gender: employee.gender || 'Male',
+        designation: employee.designation,
+        dateOfJoining: employee.dateofjoining || '',
+        basicPay: parseFloat(employee.basicpay) || 0,
+        transportAllowance: parseFloat(employee.transportallowance) || 0,
+        mealAllowance: parseFloat(employee.mealallowance) || 0,
+        department: employee.department || '',
+        address: employee.address || '',
+        napsa: employee.napsa || '',
+        nhima: employee.nhima || ''
+      });
+    }
+  }
+  
+  return employees;
+};
+
 // Employee Database - loaded from persistent storage
 const [employeeDatabase, setEmployeeDatabase] = useState([]);
 const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -290,11 +331,21 @@ const handleBulkImportEmployees = async (event) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
         try {
-            const data = JSON.parse(e.target.result);
+            let data;
             
-            // Validate the JSON structure
+            // Handle CSV files
+            if (file.name.toLowerCase().endsWith('.csv')) {
+                const csvText = e.target.result;
+                const parsedEmployees = parseCSVEmployees(csvText);
+                data = { employees: parsedEmployees };
+            } else {
+                // Handle JSON files
+                data = JSON.parse(e.target.result);
+            }
+            
+            // Validate the data structure
             if (!data.employees || !Array.isArray(data.employees)) {
-                showError('Invalid file format. Please ensure the JSON file has an "employees" array.', 'Invalid Format');
+                showError('Invalid file format. Please ensure the file has employee data in the correct format.', 'Invalid Format');
                 return;
             }
 
@@ -3281,7 +3332,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                 Bulk Import
                 <input
                   type="file"
-                  accept=".json"
+                  accept=".json,.csv"
                   onChange={handleBulkImportEmployees}
                   className="hidden"
                 />
