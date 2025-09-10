@@ -150,13 +150,6 @@ const getCurrentYearMonths = () => {
     return months.map(month => `${month} ${currentYear}`);
 };
 
-const payPeriodOptions = [
-    'January 2024', 'February 2024', 'March 2024', 'April 2024', 'May 2024', 'June 2024',
-    'July 2024', 'August 2024', 'September 2024', 'October 2024', 'November 2024', 'December 2024',
-    'January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025',
-    'July 2025', 'August 2025', 'September 2025', 'October 2025', 'November 2025', 'December 2025'
-];
-
 // Get unique periods from existing payslips for dashboard filter
 const getAvailablePeriods = () => {
     const periods = [...new Set(payslips.map(p => p.payPeriod).filter(Boolean))];

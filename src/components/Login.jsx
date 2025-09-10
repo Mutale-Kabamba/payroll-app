@@ -67,13 +67,7 @@ const Login = ({ onLogin }) => {
     setIsLoading(false);
   };
 
-  const handleDemoLogin = (username, password) => {
-    setFormData({
-      username,
-      password,
-      rememberMe: false
-    });
-  };
+  // Removed unused handleDemoLogin function
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-3 sm:p-4">

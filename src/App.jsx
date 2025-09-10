@@ -1,5 +1,6 @@
 import React from 'react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
 import PayrollGenerator from './components/PayrollGenerator';
 import './index.css';
