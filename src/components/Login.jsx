@@ -18,13 +18,13 @@ const Login = ({ onLogin, setupData }) => {
   const [forgotMessage, setForgotMessage] = useState('');
   const [isSubmittingForgot, setIsSubmittingForgot] = useState(false);
 
-  // Demo credentials for testing
-  const demoCredentials = [
-    { username: 'admin', password: 'admin123', role: 'Administrator' },
-    { username: 'hr', password: 'hr123', role: 'HR Manager' },
-    { username: 'manager', password: 'manager123', role: 'Manager' },
-    { username: 'demo', password: 'demo', role: 'Demo User' }
-  ];
+  // Demo credentials for testing (keeping for reference but not actively used)
+  // const demoCredentials = [
+  //   { username: 'admin', password: 'admin123', role: 'Administrator' },
+  //   { username: 'hr', password: 'hr123', role: 'HR Manager' },
+  //   { username: 'manager', password: 'manager123', role: 'Manager' },
+  //   { username: 'demo', password: 'demo', role: 'Demo User' }
+  // ];
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;

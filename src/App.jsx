@@ -11,7 +11,7 @@ import './index.css';
 
 const AppContent = () => {
   const { user, login, logout, isLoading: authLoading } = useAuth();
-  const { isSetupComplete, setupData, completeSetup, isLoading: setupLoading } = useSetup();
+  const { setupData, completeSetup, isLoading: setupLoading } = useSetup();
   
   const [currentView, setCurrentView] = React.useState('landing'); // landing, setup, login, app
 
