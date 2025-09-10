@@ -616,6 +616,8 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     // Create a temporary print-specific element
     const printElement = document.createElement('div');
     printElement.id = 'print-payslip';
+    // Hide the element immediately to prevent it from showing on screen
+    printElement.style.display = 'none';
     printElement.innerHTML = `
       <div class="payslip-print">
         <div class="header">
@@ -771,6 +773,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           left: 0;
           top: 0;
           width: 100%;
+          display: block !important; /* Override the display: none */
         }
         
         .payslip-print {
@@ -977,16 +980,18 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
     // Clean up after printing
     const cleanup = () => {
-      if (document.head.contains(printStyles)) {
+      if (printStyles && document.head.contains(printStyles)) {
         document.head.removeChild(printStyles);
       }
-      if (document.body.contains(printElement)) {
+      if (printElement && document.body.contains(printElement)) {
         document.body.removeChild(printElement);
       }
       window.removeEventListener('afterprint', cleanup);
+      window.removeEventListener('beforeunload', cleanup);
     };
 
     window.addEventListener('afterprint', cleanup);
+    window.addEventListener('beforeunload', cleanup);
   };
 
   const numberToWords = (num) => {
@@ -1206,6 +1211,8 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     // Create a temporary print-specific element
                     const printElement = document.createElement('div');
                     printElement.id = 'print-all-payslips';
+                    // Hide the element immediately to prevent it from showing on screen
+                    printElement.style.display = 'none';
                     
                     let payslipsHtml = '';
                     filteredPayslips.forEach((payslip, index) => {
@@ -1352,6 +1359,11 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     printStyles.id = 'print-all-styles';
                     printStyles.innerHTML = `
                       @media print {
+                        @page {
+                          size: A4;
+                          margin: 15mm;
+                        }
+                        
                         body * {
                           visibility: hidden;
                         }
@@ -1363,6 +1375,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                           left: 0;
                           top: 0;
                           width: 100%;
+                          display: block !important; /* Override the display: none */
                         }
                         
                         .payslip {
@@ -1569,12 +1582,18 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
 
                     // Clean up after printing
                     const cleanup = () => {
-                      document.head.removeChild(printStyles);
-                      document.body.removeChild(printElement);
+                      if (printStyles && document.head.contains(printStyles)) {
+                        document.head.removeChild(printStyles);
+                      }
+                      if (printElement && document.body.contains(printElement)) {
+                        document.body.removeChild(printElement);
+                      }
                       window.removeEventListener('afterprint', cleanup);
+                      window.removeEventListener('beforeunload', cleanup);
                     };
 
                     window.addEventListener('afterprint', cleanup);
+                    window.addEventListener('beforeunload', cleanup);
                   };
                   exportFilteredPayslips();
                 }}
