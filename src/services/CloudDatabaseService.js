@@ -9,7 +9,7 @@ import {
   addDoc,
   updateDoc,
   query,
-  where,
+  // where, // Commented out unused import
   orderBy,
   serverTimestamp,
   onSnapshot
@@ -333,7 +333,8 @@ class CloudDatabaseService {
       const testRef = doc(db, 'test', 'connection');
       await getDoc(testRef);
       return true;
-    } catch (error) {
+    } catch {
+      // Error handled silently
       return false;
     }
   }

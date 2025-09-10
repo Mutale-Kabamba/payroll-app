@@ -1,6 +1,6 @@
 // Firebase configuration
 import { initializeApp } from 'firebase/app';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 // Your Firebase config - Replace with your actual config
@@ -23,11 +23,5 @@ export const db = getFirestore(app);
 
 // Initialize Auth
 export const auth = getAuth(app);
-
-// For development, you might want to use the emulator
-if (process.env.NODE_ENV === 'development') {
-  // Uncomment the lines below if you want to use Firebase emulator
-  // connectFirestoreEmulator(db, 'localhost', 8080);
-}
 
 export default app;

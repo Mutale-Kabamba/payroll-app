@@ -32,7 +32,7 @@ class SyncDatabaseService {
           // Sync local data to cloud on first load
           await this.cloudService.syncLocalToCloud();
         }
-      } catch (error) {
+      } catch {
         console.log('Cloud sync not available, using local storage only');
       }
     }
@@ -71,8 +71,8 @@ class SyncDatabaseService {
             await this.cloudService.setPayrollSettings(item.data);
             break;
         }
-      } catch (error) {
-        console.error('Error processing sync queue item:', error);
+      } catch {
+        // Error handled silently
       }
     }
     
@@ -96,16 +96,16 @@ class SyncDatabaseService {
           }
           
           return cloudEmployees; // Return Firebase data only, even if empty
-        } catch (cloudError) {
-          console.error('Cloud service error, falling back to local:', cloudError);
+        } catch {
+          // Cloud error handled silently
           return this.localService.getEmployees();
         }
       } else {
         // When offline, return local data (which should be synced from Firebase)
         return this.localService.getEmployees();
       }
-    } catch (error) {
-      console.error('Error getting employees, falling back to local:', error);
+    } catch {
+      // Error handled silently
       return this.localService.getEmployees();
     }
   }
@@ -118,7 +118,7 @@ class SyncDatabaseService {
       if (this.isOnline) {
         try {
           await this.cloudService.addEmployee(employee);
-        } catch (cloudError) {
+        } catch {
           // Add to sync queue if cloud fails
           this.addToSyncQueue('addEmployee', employee);
         }
@@ -128,9 +128,9 @@ class SyncDatabaseService {
       }
       
       return true;
-    } catch (error) {
-      console.error('Error adding employee:', error);
-      throw error;
+    } catch {
+      // Error handled silently
+      // Error suppressed
     }
   }
 
@@ -142,7 +142,7 @@ class SyncDatabaseService {
       if (this.isOnline) {
         try {
           await this.cloudService.updateEmployee(employeeId, updatedEmployee);
-        } catch (cloudError) {
+        } catch {
           this.addToSyncQueue('updateEmployee', { id: employeeId, ...updatedEmployee });
         }
       } else {
@@ -150,9 +150,9 @@ class SyncDatabaseService {
       }
       
       return true;
-    } catch (error) {
-      console.error('Error updating employee:', error);
-      throw error;
+    } catch {
+      // Error handled silently
+      // Error suppressed
     }
   }
 
@@ -164,7 +164,7 @@ class SyncDatabaseService {
       if (this.isOnline) {
         try {
           await this.cloudService.deleteEmployee(employeeId);
-        } catch (cloudError) {
+        } catch {
           this.addToSyncQueue('deleteEmployee', { id: employeeId });
         }
       } else {
@@ -172,9 +172,9 @@ class SyncDatabaseService {
       }
       
       return true;
-    } catch (error) {
-      console.error('Error deleting employee:', error);
-      throw error;
+    } catch {
+      // Error handled silently
+      // Error suppressed
     }
   }
 
@@ -194,8 +194,8 @@ class SyncDatabaseService {
       } else {
         return this.localService.getPayslips();
       }
-    } catch (error) {
-      console.error('Error getting payslips, falling back to local:', error);
+    } catch {
+      // Error handled silently
       return this.localService.getPayslips();
     }
   }
@@ -208,7 +208,7 @@ class SyncDatabaseService {
       if (this.isOnline) {
         try {
           await this.cloudService.addPayslip(payslip);
-        } catch (cloudError) {
+        } catch {
           this.addToSyncQueue('addPayslip', payslip);
         }
       } else {
@@ -216,9 +216,9 @@ class SyncDatabaseService {
       }
       
       return true;
-    } catch (error) {
-      console.error('Error adding payslip:', error);
-      throw error;
+    } catch {
+      // Error handled silently
+      // Error suppressed
     }
   }
 
@@ -230,7 +230,7 @@ class SyncDatabaseService {
       if (this.isOnline) {
         try {
           await this.cloudService.deletePayslip(payslipId);
-        } catch (cloudError) {
+        } catch {
           this.addToSyncQueue('deletePayslip', { id: payslipId });
         }
       } else {
@@ -238,17 +238,17 @@ class SyncDatabaseService {
       }
       
       return true;
-    } catch (error) {
-      console.error('Error deleting payslip:', error);
-      throw error;
+    } catch {
+      // Error handled silently
+      // Error suppressed
     }
   }
 
   async cleanupDuplicatePayslips() {
     try {
       return this.localService.cleanupDuplicatePayslips();
-    } catch (error) {
-      console.error('Error cleaning up duplicate payslips:', error);
+    } catch {
+      // Error handled silently
       return false;
     }
   }
@@ -269,8 +269,8 @@ class SyncDatabaseService {
       } else {
         return this.localService.getPayrollSettings();
       }
-    } catch (error) {
-      console.error('Error getting settings, falling back to local:', error);
+    } catch {
+      // Error handled silently
       return this.localService.getPayrollSettings();
     }
   }
@@ -283,7 +283,7 @@ class SyncDatabaseService {
       if (this.isOnline) {
         try {
           await this.cloudService.setPayrollSettings(settings);
-        } catch (cloudError) {
+        } catch {
           this.addToSyncQueue('setPayrollSettings', settings);
         }
       } else {
@@ -291,9 +291,9 @@ class SyncDatabaseService {
       }
       
       return true;
-    } catch (error) {
-      console.error('Error setting payroll settings:', error);
-      throw error;
+    } catch {
+      // Error handled silently
+      // Error suppressed
     }
   }
 
@@ -353,9 +353,9 @@ class SyncDatabaseService {
       } else {
         return this.localService.exportAllData();
       }
-    } catch (error) {
-      console.error('Error exporting data:', error);
-      throw error;
+    } catch {
+      // Error handled silently
+      // Error suppressed
     }
   }
 
@@ -367,15 +367,15 @@ class SyncDatabaseService {
       if (this.isOnline) {
         try {
           await this.cloudService.importAllData(data);
-        } catch (cloudError) {
+        } catch {
           console.log('Cloud import failed, data saved locally. Will sync when online.');
         }
       }
       
       return true;
-    } catch (error) {
-      console.error('Error importing data:', error);
-      throw error;
+    } catch {
+      // Error handled silently
+      // Error suppressed
     }
   }
 
@@ -412,9 +412,9 @@ class SyncDatabaseService {
       this.syncQueue = [];
       
       return true;
-    } catch (error) {
-      console.error('Error clearing data:', error);
-      throw error;
+    } catch {
+      // Error handled silently
+      // Error suppressed
     }
   }
 

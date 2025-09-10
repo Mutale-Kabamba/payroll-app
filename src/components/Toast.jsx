@@ -12,6 +12,13 @@ const Toast = ({
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
+    const handleClose = () => {
+      setIsAnimating(false);
+      setTimeout(() => {
+        onClose();
+      }, 300);
+    };
+
     if (isVisible) {
       setIsAnimating(true);
       const timer = setTimeout(() => {
@@ -20,9 +27,9 @@ const Toast = ({
 
       return () => clearTimeout(timer);
     }
-  }, [isVisible, duration]);
+  }, [isVisible, duration, onClose]);
 
-  const handleClose = () => {
+  const handleManualClose = () => {
     setIsAnimating(false);
     setTimeout(() => {
       onClose();
@@ -100,7 +107,7 @@ const Toast = ({
           {message}
         </p>
         <button
-          onClick={handleClose}
+          onClick={handleManualClose}
           className={`ml-2 ${textColor} hover:opacity-70 transition-opacity`}
         >
           <X className="h-4 w-4" />
