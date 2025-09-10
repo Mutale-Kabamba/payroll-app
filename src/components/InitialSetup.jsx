@@ -102,7 +102,7 @@ const InitialSetup = ({ onComplete, onBack }) => {
     reader.readAsText(file);
   };
 
-  const totalSteps = 6;
+  const totalSteps = 5;
 
   const industries = [
     'Technology', 'Healthcare', 'Finance', 'Manufacturing', 'Retail', 
