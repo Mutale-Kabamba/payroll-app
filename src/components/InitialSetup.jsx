@@ -50,7 +50,7 @@ const InitialSetup = ({ onComplete, onBack }) => {
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   
   // Notification system for better user feedback
-  const { modals, showSuccess, showError, showInfo, showLoading, hideLoading, closeModal } = useNotification();
+  const { modals, showError, showInfo, showLoading, hideLoading, closeModal } = useNotification();
 
   // CSV parsing helper function
   const parseCSV = (csvText) => {
