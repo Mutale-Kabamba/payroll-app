@@ -1,15 +1,22 @@
 import React from 'react';
 import { AuthProvider } from './contexts/AuthContext';
+import { SetupProvider } from './contexts/SetupContext';
 import { useAuth } from './hooks/useAuth';
+import { useSetup } from './hooks/useSetup';
+import LandingPage from './components/LandingPage';
+import InitialSetup from './components/InitialSetup';
 import Login from './components/Login';
 import PayrollGenerator from './components/PayrollGenerator';
 import './index.css';
 
 const AppContent = () => {
-  const { user, login, logout, isLoading } = useAuth();
+  const { user, login, logout, isLoading: authLoading } = useAuth();
+  const { isSetupComplete, setupData, completeSetup, isLoading: setupLoading } = useSetup();
+  
+  const [currentView, setCurrentView] = React.useState('landing'); // landing, setup, login, app
 
-  // Show loading spinner while checking authentication
-  if (isLoading) {
+  // Show loading spinner while checking authentication and setup
+  if (authLoading || setupLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -20,19 +27,91 @@ const AppContent = () => {
     );
   }
 
-  // Show login page if user is not authenticated
-  if (!user) {
-    return <Login onLogin={login} />;
+  // Handle different app states and routing
+  const handleGetStarted = () => {
+    if (!isSetupComplete) {
+      setCurrentView('setup');
+    } else {
+      setCurrentView('login');
+    }
+  };
+
+  const handleSetupComplete = (setupInfo) => {
+    completeSetup(setupInfo);
+    setCurrentView('login');
+  };
+
+  const handleLogin = () => {
+    setCurrentView('login');
+  };
+
+  const handleLoginSuccess = (userData) => {
+    login(userData);
+    setCurrentView('app');
+  };
+
+  const handleLogout = () => {
+    logout();
+    setCurrentView('landing');
+  };
+
+  const handleBackToLanding = () => {
+    setCurrentView('landing');
+  };
+
+  // If user is already authenticated, show the main app
+  if (user && currentView === 'landing') {
+    setCurrentView('app');
   }
 
-  // Show main application if user is authenticated
-  return <PayrollGenerator user={user} onLogout={logout} />;
+  // Route to appropriate view based on current state
+  switch (currentView) {
+    case 'setup':
+      return (
+        <InitialSetup 
+          onComplete={handleSetupComplete} 
+          onBack={handleBackToLanding}
+        />
+      );
+    
+    case 'login':
+      return (
+        <Login 
+          onLogin={handleLoginSuccess}
+          setupData={setupData}
+        />
+      );
+    
+    case 'app':
+      if (!user) {
+        setCurrentView('login');
+        return null;
+      }
+      return (
+        <PayrollGenerator 
+          user={user} 
+          onLogout={handleLogout}
+          setupData={setupData}
+        />
+      );
+    
+    default: // 'landing'
+      return (
+        <LandingPage 
+          onGetStarted={handleGetStarted}
+          onLogin={handleLogin}
+          setupData={setupData}
+        />
+      );
+  }
 };
 
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <SetupProvider>
+        <AppContent />
+      </SetupProvider>
     </AuthProvider>
   );
 }

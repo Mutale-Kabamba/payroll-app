@@ -5,7 +5,25 @@ import { SuccessModal, ErrorModal, ConfirmModal, InfoModal } from './Modal';
 import LoadingModal from './LoadingModal';
 import { useNotification } from '../hooks/useNotification';
 
-const PayrollGenerator = ({ user, onLogout }) => {
+const PayrollGenerator = ({ user, onLogout, setupData }) => {
+// Get currency info from setup data
+const getCurrencyInfo = () => {
+  const currency = setupData?.currency || 'USD';
+  const currencyMap = {
+    'USD': { symbol: '$', code: 'USD' },
+    'ZMW': { symbol: 'K', code: 'ZMW' },
+    'EUR': { symbol: '€', code: 'EUR' },
+    'GBP': { symbol: '£', code: 'GBP' },
+    'ZAR': { symbol: 'R', code: 'ZAR' }
+  };
+  return currencyMap[currency] || currencyMap['USD'];
+};
+
+const formatCurrency = (amount) => {
+  const { symbol } = getCurrencyInfo();
+  return `${symbol} ${parseFloat(amount || 0).toFixed(2)}`;
+};
+
 // Employee Database - loaded from persistent storage
 const [employeeDatabase, setEmployeeDatabase] = useState([]);
 const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -1146,10 +1164,10 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               <div className="ml-4 flex-1 min-w-0">
                 <p className="text-sm text-gray-600">Total Wage Bill</p>
                 <p className="text-lg sm:text-xl font-bold text-gray-900 truncate">
-                  ZMW {payslips.reduce((sum, payslip) => {
+                  {formatCurrency(payslips.reduce((sum, payslip) => {
                     const calculatedPayslip = calculatePayslip(payslip);
                     return sum + calculatedPayslip.netPay;
-                  }, 0).toFixed(2)}
+                  }, 0))}
                 </p>
               </div>
             </div>
@@ -3075,7 +3093,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     </div>
                     
                     <div class="footer">
-                      <p>This is a system generated report - SPF & CM Enterprises Limited</p>
+                      <p>This is a system generated report - ${setupData?.companyName || 'Payroll System'}</p>
                       <p>Report generated on ${new Date().toLocaleString()}</p>
                     </div>
                   </body>
@@ -3700,7 +3718,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                 <span className="hidden sm:block lg:hidden">Payroll Management</span>
                 <span className="hidden lg:block">Payroll Management System</span>
               </h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">SPF & CM Enterprises Limited</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">{setupData?.companyName || 'Payroll System'}</p>
             </div>
             
             <div className="flex items-center space-x-2 sm:space-x-4">

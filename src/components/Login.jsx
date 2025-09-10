@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Lock, User, Building, Shield } from 'lucide-react';
 
-const Login = ({ onLogin }) => {
+const Login = ({ onLogin, setupData }) => {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -69,6 +69,10 @@ const Login = ({ onLogin }) => {
 
   // Removed unused handleDemoLogin function
 
+  // Get company info from setup data or use default
+  const companyName = setupData?.companyName || 'PayrollPro';
+  const companyDisplayName = setupData?.companyName || 'Your Company';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-3 sm:p-4">
       {/* Background Pattern */}
@@ -89,17 +93,17 @@ const Login = ({ onLogin }) => {
               </div>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">
-              <span className="block sm:hidden">Payroll System</span>
-              <span className="hidden sm:block">Payroll System</span>
+              <span className="block sm:hidden">{companyName}</span>
+              <span className="hidden sm:block">{companyName}</span>
             </h1>
-            <p className="text-blue-100 text-sm">SPF & CM Enterprises Limited</p>
+            <p className="text-blue-100 text-sm">{companyDisplayName}</p>
           </div>
 
           {/* Login Form */}
           <div className="px-6 sm:px-8 py-6">
             <div className="text-center mb-6">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">Welcome Back</h2>
-              <p className="text-gray-600 text-sm">Please sign in to access the payroll system</p>
+              <p className="text-gray-600 text-sm">Please sign in to access {companyName.toLowerCase()}</p>
             </div>
 
             {error && (
@@ -238,7 +242,7 @@ const Login = ({ onLogin }) => {
           {/* Footer */}
           <div className="bg-gray-50 px-6 sm:px-8 py-4 text-center">
             <p className="text-xs text-gray-500">
-              © 2025 SPF & CM Enterprises Limited. All rights reserved.
+              © 2025 {companyDisplayName}. All rights reserved.
             </p>
           </div>
         </div>
