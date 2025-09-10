@@ -181,6 +181,11 @@ class SyncDatabaseService {
   // PAYSLIP METHODS
   async getPayslips() {
     try {
+      console.log('🔍 getPayslips() called');
+      console.log('📡 Online status:', this.isOnline);
+      console.log('🚫 Recent deletions:', Array.from(this.recentDeletions));
+      console.log('⏰ Deletion timestamps:', Object.fromEntries(this.deletionTimestamps));
+      
       if (this.isOnline) {
         const cloudPayslips = await this.cloudService.getPayslips();
         // Update local storage with cloud data
@@ -236,6 +241,15 @@ class SyncDatabaseService {
     } catch (error) {
       console.error('Error deleting payslip:', error);
       throw error;
+    }
+  }
+
+  async cleanupDuplicatePayslips() {
+    try {
+      return this.localService.cleanupDuplicatePayslips();
+    } catch (error) {
+      console.error('Error cleaning up duplicate payslips:', error);
+      return false;
     }
   }
 

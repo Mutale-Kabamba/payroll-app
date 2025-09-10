@@ -93,6 +93,18 @@ class DatabaseService {
 
   addPayslip(payslip) {
     const payslips = this.getPayslips();
+    
+    // Check for duplicate payslips (same employee ID and pay period)
+    const existingPayslip = payslips.find(p => 
+      p.employeeId === payslip.employeeId && 
+      p.payPeriod === payslip.payPeriod
+    );
+    
+    if (existingPayslip) {
+      console.warn(`Duplicate payslip detected for employee ${payslip.employeeId} in ${payslip.payPeriod}. Skipping.`);
+      return true; // Return success but don't add duplicate
+    }
+    
     // Add timestamp and preserve existing ID if provided
     const payslipWithMeta = {
       ...payslip,
@@ -142,6 +154,35 @@ class DatabaseService {
   getPayslipsByPeriod(payPeriod) {
     const payslips = this.getPayslips();
     return payslips.filter(payslip => payslip.payPeriod === payPeriod);
+  }
+
+  // Clean up duplicate payslips (keep the latest one for each employee-period combination)
+  cleanupDuplicatePayslips() {
+    const payslips = this.getPayslips();
+    const uniquePayslips = [];
+    const seen = new Set();
+    
+    // Sort by creation date (newest first)
+    const sortedPayslips = payslips.sort((a, b) => 
+      new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    );
+    
+    for (const payslip of sortedPayslips) {
+      const key = `${payslip.employeeId}-${payslip.payPeriod}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniquePayslips.push(payslip);
+      } else {
+        console.log(`Removing duplicate payslip for ${payslip.employeeId} in ${payslip.payPeriod}`);
+      }
+    }
+    
+    if (uniquePayslips.length !== payslips.length) {
+      console.log(`Cleaned up ${payslips.length - uniquePayslips.length} duplicate payslips`);
+      return this.setPayslips(uniquePayslips);
+    }
+    
+    return true;
   }
 
   // Payroll settings CRUD operations

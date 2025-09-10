@@ -19,6 +19,7 @@ const [selectedEmployee, setSelectedEmployee] = useState(null);
 const [selectedEmployeeForPayslip, setSelectedEmployeeForPayslip] = useState('');
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+const [isCreatingPayslip, setIsCreatingPayslip] = useState(false);
 
 // Search functionality
 const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
@@ -46,6 +47,16 @@ const [payrollData, setPayrollData] = useState({
     totalDays: 30
 });
 
+// Payslip creation form state
+const [payslipFormData, setPayslipFormData] = useState({
+    payPeriod: `${new Date().toLocaleString('default', { month: 'long' })} ${new Date().getFullYear()}`,
+    workedDays: 26,
+    totalDays: 30
+});
+
+// Dashboard filter state
+const [dashboardFilterPeriod, setDashboardFilterPeriod] = useState('');
+
 // Notification hook for beautiful modals
 const { modals, showSuccess, showError, showConfirm, showInfo, showLoading, hideLoading, closeModal } = useNotification();
 
@@ -54,14 +65,25 @@ useEffect(() => {
     const loadData = async () => {
         setSyncStatus('syncing');
         try {
+            console.log('🚀 INITIAL LOAD: Starting data load...');
+            
             // Load employees from sync service
             const employees = await syncDatabaseService.getEmployees();
-            console.log('Loaded employees:', employees);
+            console.log('👥 Loaded employees:', employees);
             setEmployeeDatabase(employees);
 
             // Load payslips from sync service
+            console.log('📄 Loading payslips from sync service...');
+            
+            // Clean up any duplicate payslips first
+            await syncDatabaseService.cleanupDuplicatePayslips();
+            
             const savedPayslips = await syncDatabaseService.getPayslips();
-            console.log('Loaded payslips:', savedPayslips);
+            console.log('📊 Loaded payslips:', savedPayslips);
+            console.log('📈 Payslips count:', savedPayslips.length);
+            savedPayslips.forEach(payslip => {
+                console.log('📋 Payslip:', payslip.id, 'for employee:', payslip.employeeName || payslip.employeeId);
+            });
             setPayslips(savedPayslips);
 
             // Load payroll settings from sync service
@@ -118,12 +140,28 @@ useEffect(() => {
     saveSettings();
 }, [payrollData]);
 
+// Generate month options for current year automatically
+const getCurrentYearMonths = () => {
+    const currentYear = new Date().getFullYear();
+    const months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months.map(month => `${month} ${currentYear}`);
+};
+
 const payPeriodOptions = [
     'January 2024', 'February 2024', 'March 2024', 'April 2024', 'May 2024', 'June 2024',
     'July 2024', 'August 2024', 'September 2024', 'October 2024', 'November 2024', 'December 2024',
     'January 2025', 'February 2025', 'March 2025', 'April 2025', 'May 2025', 'June 2025',
     'July 2025', 'August 2025', 'September 2025', 'October 2025', 'November 2025', 'December 2025'
 ];
+
+// Get unique periods from existing payslips for dashboard filter
+const getAvailablePeriods = () => {
+    const periods = [...new Set(payslips.map(p => p.payPeriod).filter(Boolean))];
+    return periods.sort();
+};
 
 // Employee Management Functions
 const handleAddEmployee = async () => {
@@ -397,10 +435,27 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       return;
     }
 
+    if (isCreatingPayslip) {
+      return; // Prevent double clicks
+    }
+
+    setIsCreatingPayslip(true);
+
     try {
       const employee = employeeDatabase.find(emp => emp.id === selectedEmployeeForPayslip);
       if (!employee) {
         showError('Selected employee not found');
+        setIsCreatingPayslip(false);
+        return;
+      }
+
+      // Check if payslip already exists for this employee and pay period
+      const existingPayslip = payslips.find(p => 
+        p.employeeId === employee.id && p.payPeriod === payslipFormData.payPeriod
+      );
+      if (existingPayslip) {
+        showError(`Payslip already exists for ${employee.name} for ${payslipFormData.payPeriod}`);
+        setIsCreatingPayslip(false);
         return;
       }
 
@@ -415,10 +470,13 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         name: employee.name,
         designation: employee.designation,
         nrc: employee.nrc,
+        dateOfJoining: employee.dateOfJoining,
+        gender: employee.gender,
+        ssn: employee.ssn,
         // Payroll data
-        payPeriod: payrollData.payPeriod,
-        workedDays: payrollData.workedDays,
-        totalDays: payrollData.totalDays,
+        payPeriod: payslipFormData.payPeriod,
+        workedDays: payslipFormData.workedDays,
+        totalDays: payslipFormData.totalDays,
         basicPay: parseFloat(employee.basicPay) || 0,
         transportAllowance: parseFloat(employee.transportAllowance) || 0,
         mealAllowance: parseFloat(employee.mealAllowance) || 0,
@@ -435,17 +493,30 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       // Save to database
       await syncDatabaseService.addPayslip(newPayslip);
       
-      // Update local state
+      // Clean up any duplicates immediately after adding
+      await syncDatabaseService.cleanupDuplicatePayslips();
+      
+      // Update local state with cleaned data
       const updatedPayslips = await syncDatabaseService.getPayslips();
       setPayslips(updatedPayslips);
 
       hideLoading();
       showSuccess(`Payslip generated successfully for ${employee.name}!`);
       setSelectedEmployeeForPayslip('');
+      
+      // Reset payslip form
+      setNewPayslip({
+        employeeId: '',
+        otherEarnings: [],
+        otherDeductions: []
+      });
+      
+      setIsCreatingPayslip(false);
     } catch (error) {
       console.error('Error generating payslip:', error);
       hideLoading();
       showError('Failed to generate payslip');
+      setIsCreatingPayslip(false);
     }
   };
 
@@ -488,14 +559,14 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
   };
 
   const deletePayslip = (payslipId) => {
-    console.log('Delete payslip called with ID:', payslipId);
-    console.log('Current payslips:', payslips);
+    console.log('🗑️ Delete payslip called with ID:', payslipId);
+    console.log('📊 Current payslips:', payslips);
     
     const payslip = payslips.find(p => p.id === payslipId);
-    console.log('Found payslip to delete:', payslip);
+    console.log('🔍 Found payslip to delete:', payslip);
     
     if (!payslip) {
-      console.error('Payslip not found with ID:', payslipId);
+      console.error('❌ Payslip not found with ID:', payslipId);
       showError('Payslip not found');
       return;
     }
@@ -504,19 +575,15 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       'Are you sure you want to delete this payslip? This action cannot be undone.',
       async () => {
         try {
-          console.log('Starting delete operation for payslip ID:', payslipId);
+          console.log('🚀 Starting delete operation for payslip ID:', payslipId);
           showLoading('Deleting payslip...');
           
-          // Delete from database service
+          // Delete from database
           await syncDatabaseService.deletePayslip(payslipId);
-          console.log('Successfully deleted from database');
           
-          // Immediately update local state to reflect the change
-          setPayslips(prevPayslips => {
-            const filtered = prevPayslips.filter(p => p.id !== payslipId);
-            console.log('Updated payslips after delete:', filtered);
-            return filtered;
-          });
+          // Update local state with fresh data
+          const updatedPayslips = await syncDatabaseService.getPayslips();
+          setPayslips(updatedPayslips);
           
           hideLoading();
           closeModal('confirm');
@@ -541,6 +608,390 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     const payslip = calculatePayslip(payslipData);
     setSelectedEmployee(payslip);
     setCurrentView('payslip');
+  };
+
+  const printSinglePayslip = (payslipData) => {
+    const calculatedPayslip = calculatePayslip(payslipData);
+    
+    // Create a temporary print-specific element
+    const printElement = document.createElement('div');
+    printElement.id = 'print-payslip';
+    // Hide the element immediately to prevent it from showing on screen
+    printElement.style.display = 'none';
+    printElement.innerHTML = `
+      <div class="payslip-print">
+        <div class="header">
+          <div class="company-name">SPF & CM ENTERPRISES LIMITED</div>
+          <div class="company-address">2670 Town Area, Senanga Rd.</div>
+        </div>
+        
+        <div class="payslip-title">Payslip</div>
+        
+        <table class="employee-info">
+          <tr>
+            <td class="info-section">
+              <div class="info-row">
+                <span class="label">Employee Number:</span>
+                <span class="value">${payslipData.employeeId || payslipData.id || payslipData.employee?.id || 'N/A'}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Date of Joining:</span>
+                <span class="value">${payslipData.dateOfJoining || payslipData.employee?.dateOfJoining || 'N/A'}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Pay Period:</span>
+                <span class="value">${payslipData.payPeriod || 'N/A'}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Worked Days:</span>
+                <span class="value">${payslipData.workedDays || payslipData.totalDays || 'N/A'}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Total Days:</span>
+                <span class="value">${payslipData.totalDays || 'N/A'}</span>
+              </div>
+            </td>
+            <td class="info-section">
+              <div class="info-row">
+                <span class="label">Employee Name:</span>
+                <span class="value">${payslipData.name || payslipData.employee?.name || 'N/A'}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Gender:</span>
+                <span class="value">${payslipData.gender || payslipData.employee?.gender || 'N/A'}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">NRC:</span>
+                <span class="value">${payslipData.nrc || payslipData.employee?.nrc || 'N/A'}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">SSN:</span>
+                <span class="value">${payslipData.ssn || payslipData.employee?.ssn || 'N/A'}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Department:</span>
+                <span class="value">${payslipData.department || payslipData.employee?.department || 'N/A'}</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+        
+        <div class="designation-section">
+          <strong>Designation:</strong> ${payslipData.designation || payslipData.employee?.designation || 'N/A'}
+        </div>
+        
+        <table class="earnings-deductions">
+          <tr>
+            <th class="section-title">Earnings</th>
+            <th class="section-title">Amount</th>
+            <th class="section-title">Deductions</th>
+            <th class="section-title">Amount</th>
+          </tr>
+          <tr>
+            <td>Basic</td>
+            <td>ZMW ${(payslipData.basicPay || payslipData.employee?.basicPay || 0).toFixed(2)}</td>
+            <td>NAPSA</td>
+            <td>ZMW ${(calculatedPayslip.deductions?.napsa || 0).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td>Transport Allowance</td>
+            <td>ZMW ${(payslipData.transportAllowance || payslipData.employee?.transportAllowance || 0).toFixed(2)}</td>
+            <td>NHIMA</td>
+            <td>ZMW ${(calculatedPayslip.deductions?.nhima || 0).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td>House Rent Allowance</td>
+            <td>ZMW ${(calculatedPayslip.houseRentAllowance || 0).toFixed(2)}</td>
+            <td>Loan</td>
+            <td>ZMW ${(calculatedPayslip.deductions?.loan || 0).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td>Meal Allowance</td>
+            <td>ZMW ${(payslipData.mealAllowance || payslipData.employee?.mealAllowance || 0).toFixed(2)}</td>
+            <td></td>
+            <td></td>
+          </tr>
+          ${(payslipData.otherEarnings || []).map(earning => 
+            `<tr><td>${earning.name || 'Other Earning'}</td><td>ZMW ${(earning.amount || 0).toFixed(2)}</td><td></td><td></td></tr>`
+          ).join('')}
+          ${(payslipData.otherDeductions || []).map(deduction => 
+            `<tr><td></td><td></td><td>${deduction.name || 'Other Deduction'}</td><td>ZMW ${(deduction.amount || 0).toFixed(2)}</td></tr>`
+          ).join('')}
+          <tr class="total-row">
+            <td><strong>Total Earnings</strong></td>
+            <td><strong>ZMW ${(calculatedPayslip.totalEarnings || 0).toFixed(2)}</strong></td>
+            <td><strong>Total Deductions</strong></td>
+            <td><strong>ZMW ${(calculatedPayslip.totalDeductions || 0).toFixed(2)}</strong></td>
+          </tr>
+        </table>
+        
+        <div class="net-pay">
+          <strong>Net Pay: ZMW ${(calculatedPayslip.netPay || 0).toFixed(2)}</strong>
+        </div>
+        
+        <div class="amount-words">
+          Amount in words: ${numberToWords(calculatedPayslip.netPay || 0)}
+        </div>
+        
+        <table class="signatures">
+          <tr>
+            <td class="signature">
+              <div class="signature-line"></div>
+              <div>Employer Signature</div>
+            </td>
+            <td class="signature">
+              <div class="signature-line"></div>
+              <div>Employee Signature</div>
+            </td>
+          </tr>
+        </table>
+        
+        <div class="footer">
+          Generated on ${new Date().toLocaleDateString()} | This is system generated payslip
+        </div>
+      </div>
+    `;
+
+    // Add print-specific styles
+    const printStyles = document.createElement('style');
+    printStyles.id = 'print-styles';
+    printStyles.innerHTML = `
+      @media print {
+        @page {
+          size: A4;
+          margin: 15mm;
+        }
+        
+        body * {
+          visibility: hidden;
+        }
+        #print-payslip, #print-payslip * {
+          visibility: visible;
+        }
+        #print-payslip {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          display: block !important; /* Override the display: none */
+        }
+        
+        .payslip-print {
+          font-family: Arial, sans-serif;
+          font-size: 12px;
+          line-height: 1.4;
+          color: black !important;
+          width: 100%;
+          max-width: 210mm;
+          margin: 0 auto;
+          background: white !important;
+        }
+        
+        .header {
+          text-align: center;
+          margin-bottom: 20px;
+          border-bottom: 2px solid black !important;
+          padding-bottom: 10px;
+        }
+        
+        .company-name {
+          font-size: 18px;
+          font-weight: bold;
+          margin-bottom: 5px;
+          letter-spacing: 1px;
+          color: black !important;
+        }
+        
+        .company-address {
+          font-size: 12px;
+          color: black !important;
+          margin-bottom: 5px;
+        }
+        
+        .payslip-title {
+          font-size: 16px;
+          font-weight: bold;
+          margin: 15px 0;
+          text-align: center;
+          text-decoration: underline;
+          color: black !important;
+        }
+        
+        .employee-info {
+          width: 100% !important;
+          margin-bottom: 20px !important;
+          border: 2px solid black !important;
+          border-collapse: collapse !important;
+          background-color: #f8f9fa !important;
+          table-layout: fixed !important;
+        }
+        
+        .employee-info td {
+          padding: 12px !important;
+          vertical-align: top !important;
+          width: 50% !important;
+          border-right: 1px solid black !important;
+          border-bottom: none !important;
+          font-size: 11px !important;
+          line-height: 1.3 !important;
+        }
+        
+        .employee-info td:last-child {
+          border-right: none !important;
+        }
+        
+        .info-row {
+          margin-bottom: 8px !important;
+          font-size: 11px !important;
+          display: flex !important;
+          justify-content: space-between !important;
+          align-items: flex-start !important;
+          clear: both !important;
+          width: 100% !important;
+        }
+        
+        .info-row:last-child {
+          margin-bottom: 0 !important;
+        }
+        
+        .label {
+          font-weight: bold !important;
+          color: black !important;
+          width: 48% !important;
+          text-align: left !important;
+          display: inline-block !important;
+          margin-right: 4px !important;
+        }
+        
+        .value {
+          color: black !important;
+          width: 48% !important;
+          text-align: left !important;
+          display: inline-block !important;
+          word-wrap: break-word !important;
+        }
+        
+        .designation-section {
+          text-align: center;
+          margin-bottom: 20px;
+          padding: 8px;
+          background-color: #f0f0f0 !important;
+          border: 1px solid black !important;
+          font-size: 12px;
+          color: black !important;
+        }
+        
+        .earnings-deductions {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 20px;
+          border: 1px solid black !important;
+        }
+        
+        .earnings-deductions th,
+        .earnings-deductions td {
+          border: 1px solid black !important;
+          padding: 6px 8px;
+          text-align: left;
+          font-size: 11px;
+          color: black !important;
+        }
+        
+        .section-title {
+          font-weight: bold;
+          text-align: center;
+          background-color: #e0e0e0 !important;
+          color: black !important;
+        }
+        
+        .earnings-deductions td:nth-child(2),
+        .earnings-deductions td:nth-child(4) {
+          text-align: right;
+        }
+        
+        .total-row {
+          background-color: #f0f0f0 !important;
+        }
+        
+        .total-row td {
+          font-weight: bold !important;
+          border-top: 2px solid black !important;
+          color: black !important;
+        }
+        
+        .net-pay {
+          text-align: center;
+          margin: 20px 0;
+          padding: 12px;
+          background-color: #f0f0f0 !important;
+          font-size: 16px;
+          font-weight: bold;
+          border: 2px solid black !important;
+          color: black !important;
+        }
+        
+        .amount-words {
+          margin: 15px 0;
+          font-style: italic;
+          font-size: 11px;
+          text-align: center;
+          padding: 8px;
+          border: 1px dashed black !important;
+          color: black !important;
+        }
+        
+        .signatures {
+          width: 100%;
+          margin-top: 30px;
+          border-collapse: collapse;
+        }
+        
+        .signature {
+          width: 50%;
+          text-align: center;
+          padding: 20px 10px;
+          font-size: 11px;
+          color: black !important;
+        }
+        
+        .signature-line {
+          border-bottom: 1px solid black !important;
+          height: 40px;
+          margin-bottom: 8px;
+        }
+        
+        .footer {
+          margin-top: 20px;
+          text-align: center;
+          font-size: 10px;
+          color: black !important;
+          border-top: 1px solid black !important;
+          padding-top: 8px;
+        }
+      }
+    `;
+
+    // Add elements to the page
+    document.head.appendChild(printStyles);
+    document.body.appendChild(printElement);
+
+    // Trigger print
+    window.print();
+
+    // Clean up after printing
+    const cleanup = () => {
+      if (printStyles && document.head.contains(printStyles)) {
+        document.head.removeChild(printStyles);
+      }
+      if (printElement && document.body.contains(printElement)) {
+        document.body.removeChild(printElement);
+      }
+      window.removeEventListener('afterprint', cleanup);
+      window.removeEventListener('beforeunload', cleanup);
+    };
+
+    window.addEventListener('afterprint', cleanup);
+    window.addEventListener('beforeunload', cleanup);
   };
 
   const numberToWords = (num) => {
@@ -596,14 +1047,22 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     return result;
   };
 
-  // Search filtering functions
-  const filterPayslips = (payslips, searchQuery) => {
+  // Search and period filtering functions
+  const filterPayslipsByPeriod = (payslips, selectedPeriod) => {
+    return payslips.filter(payslip => payslip.payPeriod === selectedPeriod);
+  };
+
+  const filterPayslips = (payslips, searchQuery, selectedPeriod = null) => {
+    // First filter by period if specified
+    let filteredPayslips = selectedPeriod ? filterPayslipsByPeriod(payslips, selectedPeriod) : payslips;
+    
+    // Then filter by search query if provided
     if (!searchQuery.trim()) {
-      return payslips;
+      return filteredPayslips;
     }
     
     const query = searchQuery.toLowerCase().trim();
-    return payslips.filter(payslip => {
+    return filteredPayslips.filter(payslip => {
       return (
         payslip.name?.toLowerCase().includes(query) ||
         payslip.id?.toLowerCase().includes(query) ||
@@ -631,48 +1090,30 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     });
   };
 
-  const renderDashboard = () => (
+  const renderDashboard = () => {
+    const availablePeriods = getAvailablePeriods();
+    // Use dashboardFilterPeriod directly, don't auto-select if empty (empty means "All Periods")
+    const currentFilterPeriod = dashboardFilterPeriod;
+    
+    return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Pay Period Selector */}
+      {/* Pay Period Filter */}
       <div className="bg-white rounded-lg border border-gray-300 shadow-sm p-3 sm:p-4">
         <div className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
           <div className="flex-shrink-0">
-            <label className="text-sm font-medium text-gray-700">Pay Period:</label>
+            <label className="text-sm font-medium text-gray-700">Filter by Pay Period:</label>
           </div>
           <div className="flex-1">
             <select
-              value={payrollData.payPeriod}
-              onChange={(e) => setPayrollData({ ...payrollData, payPeriod: e.target.value })}
+              value={currentFilterPeriod || ""}
+              onChange={(e) => setDashboardFilterPeriod(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              {payPeriodOptions.map(period => (
+              <option value="">All Periods</option>
+              {availablePeriods.map(period => (
                 <option key={period} value={period}>{period}</option>
               ))}
             </select>
-          </div>
-          <div className="flex flex-col xs:flex-row gap-3 xs:gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Worked Days:</label>
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={payrollData.workedDays}
-                onChange={(e) => setPayrollData({ ...payrollData, workedDays: parseInt(e.target.value) || 0 })}
-                className="w-16 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Total Days:</label>
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={payrollData.totalDays}
-                onChange={(e) => setPayrollData({ ...payrollData, totalDays: parseInt(e.target.value) || 0 })}
-                className="w-16 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -728,8 +1169,8 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               <Calendar className="h-6 w-6 text-purple-600" />
             </div>
             <div className="ml-4 flex-1 min-w-0">
-              <p className="text-sm text-gray-600">Pay Period</p>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{payrollData.payPeriod}</p>
+              <p className="text-sm text-gray-600">Viewing Period</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{currentFilterPeriod || 'All Periods'}</p>
             </div>
           </div>
         </div>
@@ -742,7 +1183,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             <div>
               <h2 className="text-lg font-bold text-gray-900">Generated Payslips</h2>
               <p className="text-xs text-gray-600 mt-1">
-                {payrollData.payPeriod} • {filterPayslips(payslips, dashboardSearchQuery).length} payslip{filterPayslips(payslips, dashboardSearchQuery).length !== 1 ? 's' : ''}
+                {currentFilterPeriod || 'All Periods'} • {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length} payslip{filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length !== 1 ? 's' : ''}
               </p>
             </div>
             <div className="relative">
@@ -760,172 +1201,24 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             <div className="flex flex-col xs:flex-row gap-2">
               <button
                 onClick={() => {
-                  const filteredPayslips = filterPayslips(payslips, dashboardSearchQuery);
+                  const filteredPayslips = filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod);
                   if (filteredPayslips.length === 0) {
                     showInfo('No payslips found matching your search criteria. Please try a different search term or create some payslips first.', 'No Payslips Found');
                     return;
                   }
                   // Generate and export filtered payslips as PDF
                   const exportFilteredPayslips = () => {
-                    const printWindow = window.open('', '_blank');
-                    let htmlContent = `
-                      <!DOCTYPE html>
-                      <html>
-                      <head>
-                        <title>Filtered Payslips - ${payrollData.payPeriod}</title>
-                        <style>
-                          @page {
-                            size: A4;
-                            margin: 15mm 15mm 15mm 15mm;
-                          }
-                          body { 
-                            font-family: Arial, sans-serif; 
-                            margin: 0; 
-                            padding: 0; 
-                            font-size: 12px;
-                            line-height: 1.4;
-                            color: #000;
-                          }
-                          .payslip { 
-                            page-break-after: always; 
-                            width: 100%;
-                            height: 100vh;
-                            display: flex;
-                            flex-direction: column;
-                            justify-content: space-between;
-                            padding: 10mm 0;
-                          }
-                          .payslip:last-child { page-break-after: auto; }
-                          .header { 
-                            text-align: center; 
-                            margin-bottom: 20px; 
-                            border-bottom: 2px solid #000;
-                            padding-bottom: 10px;
-                          }
-                          .company-name { 
-                            font-size: 18px; 
-                            font-weight: bold; 
-                            margin-bottom: 3px; 
-                            letter-spacing: 1px;
-                          }
-                          .company-address { 
-                            font-size: 11px; 
-                            color: #333; 
-                            margin-bottom: 5px;
-                          }
-                          .payslip-title { 
-                            font-size: 16px; 
-                            font-weight: bold; 
-                            margin: 15px 0; 
-                            text-align: center;
-                            text-decoration: underline;
-                          }
-                          .employee-info { 
-                            display: flex; 
-                            justify-content: space-between; 
-                            margin-bottom: 20px;
-                            border: 1px solid #ccc;
-                            padding: 10px;
-                            background-color: #f9f9f9;
-                          }
-                          .info-section { width: 48%; }
-                          .info-row { 
-                            display: flex; 
-                            justify-content: space-between; 
-                            margin-bottom: 4px;
-                            font-size: 11px;
-                          }
-                          .label { 
-                            font-weight: bold; 
-                            width: 45%;
-                          }
-                          .value {
-                            width: 55%;
-                            text-align: left;
-                          }
-                          .earnings-deductions { 
-                            display: flex; 
-                            justify-content: space-between; 
-                            margin-top: 15px;
-                            flex: 1;
-                          }
-                          .earnings, .deductions { 
-                            width: 48%; 
-                            border: 1px solid #333;
-                            padding: 10px;
-                          }
-                          .section-title { 
-                            font-weight: bold; 
-                            font-size: 14px; 
-                            margin-bottom: 8px;
-                            text-align: center;
-                            background-color: #e0e0e0;
-                            padding: 5px;
-                            margin: -10px -10px 10px -10px;
-                          }
-                          .amount-row { 
-                            display: flex; 
-                            justify-content: space-between; 
-                            margin-bottom: 3px;
-                            font-size: 11px;
-                            padding: 2px 0;
-                          }
-                          .total-row { 
-                            border-top: 2px solid #000; 
-                            padding-top: 5px; 
-                            margin-top: 8px; 
-                            font-weight: bold;
-                            font-size: 12px;
-                          }
-                          .net-pay { 
-                            text-align: center; 
-                            margin-top: 15px; 
-                            padding: 8px; 
-                            background-color: #f0f0f0; 
-                            font-size: 16px; 
-                            font-weight: bold;
-                            border: 2px solid #000;
-                          }
-                          .amount-words { 
-                            margin-top: 10px; 
-                            font-style: italic;
-                            font-size: 11px;
-                            text-align: center;
-                            padding: 5px;
-                            border: 1px dashed #666;
-                          }
-                          .footer {
-                            margin-top: 15px;
-                            text-align: center;
-                            font-size: 10px;
-                            color: #666;
-                            border-top: 1px solid #ccc;
-                            padding-top: 5px;
-                          }
-                          @media print {
-                            body { 
-                              margin: 0;
-                              -webkit-print-color-adjust: exact;
-                              print-color-adjust: exact;
-                            }
-                            .payslip { 
-                              page-break-after: always;
-                              height: auto;
-                              min-height: 90vh;
-                            }
-                            .payslip:last-child {
-                              page-break-after: auto;
-                            }
-                          }
-                        </style>
-                      </head>
-                      <body>
-                    `;
-
+                    // Create a temporary print-specific element
+                    const printElement = document.createElement('div');
+                    printElement.id = 'print-all-payslips';
+                    // Hide the element immediately to prevent it from showing on screen
+                    printElement.style.display = 'none';
+                    
+                    let payslipsHtml = '';
                     filteredPayslips.forEach((payslip, index) => {
                       const calculatedPayslip = calculatePayslip(payslip);
-                      htmlContent += `
-                        <div class="payslip">
+                      payslipsHtml += `
+                        <div class="payslip${index < filteredPayslips.length - 1 ? ' page-break' : ''}">
                           <div class="header">
                             <div class="company-name">SPF & CM ENTERPRISES LIMITED</div>
                             <div class="company-address">2670 Town Area, Senanga Rd.</div>
@@ -933,54 +1226,124 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                           
                           <div class="payslip-title">Payslip</div>
                           
-                          <div class="employee-info">
-                            <div class="info-section">
-                              <div class="info-row"><span class="label">Employee Number:</span> <span class="value">${payslip.id}</span></div>
-                              <div class="info-row"><span class="label">Date of Joining:</span> <span class="value">${payslip.dateOfJoining}</span></div>
-                              <div class="info-row"><span class="label">Pay Period:</span> <span class="value">${payslip.payrollPeriod}</span></div>
-                              <div class="info-row"><span class="label">Worked Days:</span> <span class="value">${payslip.workedDays || payrollData.workedDays}</span></div>
-                              <div class="info-row"><span class="label">Designation:</span> <span class="value">${payslip.designation}</span></div>
-                            </div>
-                            <div class="info-section">
-                              <div class="info-row"><span class="label">Employee Name:</span> <span class="value">${payslip.name}</span></div>
-                              <div class="info-row"><span class="label">Gender:</span> <span class="value">${payslip.gender}</span></div>
-                              <div class="info-row"><span class="label">NRC:</span> <span class="value">${payslip.nrc}</span></div>
-                              <div class="info-row"><span class="label">SSN:</span> <span class="value">${payslip.ssn}</span></div>
-                            </div>
+                          <table class="employee-info">
+                            <tr>
+                              <td class="info-section">
+                                <div class="info-row">
+                                  <span class="label">Employee Number:</span>
+                                  <span class="value">${payslip.employeeId || payslip.id || payslip.employee?.id || 'N/A'}</span>
+                                </div>
+                                <div class="info-row">
+                                  <span class="label">Date of Joining:</span>
+                                  <span class="value">${payslip.dateOfJoining || payslip.employee?.dateOfJoining || 'N/A'}</span>
+                                </div>
+                                <div class="info-row">
+                                  <span class="label">Pay Period:</span>
+                                  <span class="value">${payslip.payPeriod || 'N/A'}</span>
+                                </div>
+                                <div class="info-row">
+                                  <span class="label">Worked Days:</span>
+                                  <span class="value">${payslip.workedDays || payslip.totalDays || 'N/A'}</span>
+                                </div>
+                                <div class="info-row">
+                                  <span class="label">Total Days:</span>
+                                  <span class="value">${payslip.totalDays || 'N/A'}</span>
+                                </div>
+                              </td>
+                              <td class="info-section">
+                                <div class="info-row">
+                                  <span class="label">Employee Name:</span>
+                                  <span class="value">${payslip.name || payslip.employee?.name || 'N/A'}</span>
+                                </div>
+                                <div class="info-row">
+                                  <span class="label">Gender:</span>
+                                  <span class="value">${payslip.gender || payslip.employee?.gender || 'N/A'}</span>
+                                </div>
+                                <div class="info-row">
+                                  <span class="label">NRC:</span>
+                                  <span class="value">${payslip.nrc || payslip.employee?.nrc || 'N/A'}</span>
+                                </div>
+                                <div class="info-row">
+                                  <span class="label">SSN:</span>
+                                  <span class="value">${payslip.ssn || payslip.employee?.ssn || 'N/A'}</span>
+                                </div>
+                                <div class="info-row">
+                                  <span class="label">Department:</span>
+                                  <span class="value">${payslip.department || payslip.employee?.department || 'N/A'}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          </table>
+                          
+                          <div class="designation-section">
+                            <strong>Designation:</strong> ${payslip.designation || payslip.employee?.designation || 'N/A'}
                           </div>
                           
-                          <div class="earnings-deductions">
-                            <div class="earnings">
-                              <div class="section-title">Earnings</div>
-                              <div class="amount-row"><span>Basic</span> <span>ZMW ${payslip.basicPay.toFixed(2)}</span></div>
-                              <div class="amount-row"><span>Transport Allowance</span> <span>ZMW ${payslip.transportAllowance.toFixed(2)}</span></div>
-                              <div class="amount-row"><span>House Rent Allowance</span> <span>ZMW ${calculatedPayslip.houseRentAllowance.toFixed(2)}</span></div>
-                              <div class="amount-row"><span>Meal Allowance</span> <span>ZMW ${payslip.mealAllowance.toFixed(2)}</span></div>
-                              ${(payslip.otherEarnings || []).map(earning => 
-                                `<div class="amount-row"><span>${earning.name}</span> <span>ZMW ${earning.amount.toFixed(2)}</span></div>`
-                              ).join('')}
-                              <div class="amount-row total-row"><span>Total Earnings</span> <span>ZMW ${calculatedPayslip.totalEarnings.toFixed(2)}</span></div>
-                            </div>
-                            
-                            <div class="deductions">
-                              <div class="section-title">Deductions</div>
-                              <div class="amount-row"><span>NAPSA</span> <span>ZMW ${calculatedPayslip.deductions.napsa.toFixed(2)}</span></div>
-                              <div class="amount-row"><span>NHIMA</span> <span>ZMW ${calculatedPayslip.deductions.nhima.toFixed(2)}</span></div>
-                              <div class="amount-row"><span>Loan</span> <span>ZMW ${calculatedPayslip.deductions.loan.toFixed(2)}</span></div>
-                              ${(payslip.otherDeductions || []).map(deduction => 
-                                `<div class="amount-row"><span>${deduction.name}</span> <span>ZMW ${deduction.amount.toFixed(2)}</span></div>`
-                              ).join('')}
-                              <div class="amount-row total-row"><span>Total Deductions</span> <span>ZMW ${calculatedPayslip.totalDeductions.toFixed(2)}</span></div>
-                            </div>
-                          </div>
+                          <table class="earnings-deductions">
+                            <tr>
+                              <th class="section-title">Earnings</th>
+                              <th class="section-title">Amount</th>
+                              <th class="section-title">Deductions</th>
+                              <th class="section-title">Amount</th>
+                            </tr>
+                            <tr>
+                              <td>Basic</td>
+                              <td>ZMW ${(payslip.basicPay || payslip.employee?.basicPay || 0).toFixed(2)}</td>
+                              <td>NAPSA</td>
+                              <td>ZMW ${(calculatedPayslip.deductions?.napsa || 0).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                              <td>Transport Allowance</td>
+                              <td>ZMW ${(payslip.transportAllowance || payslip.employee?.transportAllowance || 0).toFixed(2)}</td>
+                              <td>NHIMA</td>
+                              <td>ZMW ${(calculatedPayslip.deductions?.nhima || 0).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                              <td>House Rent Allowance</td>
+                              <td>ZMW ${(calculatedPayslip.houseRentAllowance || 0).toFixed(2)}</td>
+                              <td>Loan</td>
+                              <td>ZMW ${(calculatedPayslip.deductions?.loan || 0).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                              <td>Meal Allowance</td>
+                              <td>ZMW ${(payslip.mealAllowance || payslip.employee?.mealAllowance || 0).toFixed(2)}</td>
+                              <td></td>
+                              <td></td>
+                            </tr>
+                            ${(payslip.otherEarnings || []).map(earning => 
+                              `<tr><td>${earning.name || 'Other Earning'}</td><td>ZMW ${(earning.amount || 0).toFixed(2)}</td><td></td><td></td></tr>`
+                            ).join('')}
+                            ${(payslip.otherDeductions || []).map(deduction => 
+                              `<tr><td></td><td></td><td>${deduction.name || 'Other Deduction'}</td><td>ZMW ${(deduction.amount || 0).toFixed(2)}</td></tr>`
+                            ).join('')}
+                            <tr class="total-row">
+                              <td><strong>Total Earnings</strong></td>
+                              <td><strong>ZMW ${(calculatedPayslip.totalEarnings || 0).toFixed(2)}</strong></td>
+                              <td><strong>Total Deductions</strong></td>
+                              <td><strong>ZMW ${(calculatedPayslip.totalDeductions || 0).toFixed(2)}</strong></td>
+                            </tr>
+                          </table>
                           
                           <div class="net-pay">
-                            Net Pay: ZMW ${calculatedPayslip.netPay.toFixed(2)}
+                            <strong>Net Pay: ZMW ${(calculatedPayslip.netPay || 0).toFixed(2)}</strong>
                           </div>
                           
                           <div class="amount-words">
-                            Amount in words: ${numberToWords(calculatedPayslip.netPay)}
+                            Amount in words: ${numberToWords(calculatedPayslip.netPay || 0)}
                           </div>
+                          
+                          <table class="signatures">
+                            <tr>
+                              <td class="signature">
+                                <div class="signature-line"></div>
+                                <div>Employer Signature</div>
+                              </td>
+                              <td class="signature">
+                                <div class="signature-line"></div>
+                                <div>Employee Signature</div>
+                              </td>
+                            </tr>
+                          </table>
                           
                           <div class="footer">
                             Generated on ${new Date().toLocaleDateString()} | Page ${index + 1} of ${filteredPayslips.length}
@@ -988,30 +1351,261 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                         </div>
                       `;
                     });
+                    
+                    printElement.innerHTML = payslipsHtml;
 
-                    htmlContent += `
-                      </body>
-                      </html>
+                    // Add print-specific styles
+                    const printStyles = document.createElement('style');
+                    printStyles.id = 'print-all-styles';
+                    printStyles.innerHTML = `
+                      @media print {
+                        @page {
+                          size: A4;
+                          margin: 15mm;
+                        }
+                        
+                        body * {
+                          visibility: hidden;
+                        }
+                        #print-all-payslips, #print-all-payslips * {
+                          visibility: visible;
+                        }
+                        #print-all-payslips {
+                          position: absolute;
+                          left: 0;
+                          top: 0;
+                          width: 100%;
+                          display: block !important; /* Override the display: none */
+                        }
+                        
+                        .payslip {
+                          font-family: Arial, sans-serif;
+                          font-size: 12px;
+                          line-height: 1.4;
+                          color: #000;
+                          width: 100%;
+                          padding: 10mm 0;
+                        }
+                        
+                        .page-break {
+                          page-break-after: always;
+                        }
+                        
+                        .header {
+                          text-align: center;
+                          margin-bottom: 20px;
+                          border-bottom: 2px solid #000;
+                          padding-bottom: 10px;
+                        }
+                        
+                        .company-name {
+                          font-size: 18px;
+                          font-weight: bold;
+                          margin-bottom: 3px;
+                          letter-spacing: 1px;
+                        }
+                        
+                        .company-address {
+                          font-size: 11px;
+                          color: #333;
+                          margin-bottom: 5px;
+                        }
+                        
+                        .payslip-title {
+                          font-size: 16px;
+                          font-weight: bold;
+                          margin: 15px 0;
+                          text-align: center;
+                          text-decoration: underline;
+                        }
+                        
+                        .employee-info {
+                          width: 100% !important;
+                          margin-bottom: 20px !important;
+                          border: 2px solid black !important;
+                          border-collapse: collapse !important;
+                          background-color: #f8f9fa !important;
+                          table-layout: fixed !important;
+                        }
+                        
+                        .employee-info td {
+                          padding: 12px !important;
+                          vertical-align: top !important;
+                          width: 50% !important;
+                          border-right: 1px solid black !important;
+                          border-bottom: none !important;
+                          font-size: 11px !important;
+                          line-height: 1.3 !important;
+                        }
+                        
+                        .employee-info td:last-child {
+                          border-right: none !important;
+                        }
+                        
+                        .info-row {
+                          margin-bottom: 8px !important;
+                          font-size: 11px !important;
+                          display: flex !important;
+                          justify-content: space-between !important;
+                          align-items: flex-start !important;
+                          clear: both !important;
+                          width: 100% !important;
+                        }
+                        
+                        .info-row:last-child {
+                          margin-bottom: 0 !important;
+                        }
+                        
+                        .label {
+                          font-weight: bold !important;
+                          color: black !important;
+                          width: 48% !important;
+                          text-align: left !important;
+                          display: inline-block !important;
+                          margin-right: 4px !important;
+                        }
+                        
+                        .designation-section {
+                          text-align: center !important;
+                          margin-bottom: 20px !important;
+                          padding: 8px !important;
+                          background-color: #f0f0f0 !important;
+                          border: 1px solid black !important;
+                          font-size: 12px !important;
+                          color: black !important;
+                        }
+                        
+                        .value {
+                          color: black !important;
+                          width: 48% !important;
+                          text-align: left !important;
+                          display: inline-block !important;
+                          word-wrap: break-word !important;
+                        }
+                        
+                        .earnings-deductions {
+                          width: 100% !important;
+                          border-collapse: collapse !important;
+                          margin-bottom: 20px !important;
+                          border: 1px solid black !important;
+                        }
+                        
+                        .earnings-deductions th,
+                        .earnings-deductions td {
+                          border: 1px solid black !important;
+                          padding: 6px 8px !important;
+                          text-align: left !important;
+                          font-size: 11px !important;
+                          color: black !important;
+                        }
+                        
+                        .section-title {
+                          font-weight: bold !important;
+                          text-align: center !important;
+                          background-color: #e0e0e0 !important;
+                          color: black !important;
+                        }
+                        
+                        .earnings-deductions td:nth-child(2),
+                        .earnings-deductions td:nth-child(4) {
+                          text-align: right !important;
+                        }
+                        
+                        .total-row {
+                          background-color: #f0f0f0 !important;
+                        }
+                        
+                        .total-row td {
+                          font-weight: bold !important;
+                          border-top: 2px solid black !important;
+                          color: black !important;
+                        }
+                        
+                        .net-pay {
+                          text-align: center !important;
+                          margin: 20px 0 !important;
+                          padding: 12px !important;
+                          background-color: #f0f0f0 !important;
+                          font-size: 16px !important;
+                          font-weight: bold !important;
+                          border: 2px solid black !important;
+                          color: black !important;
+                        }
+                        
+                        .amount-words {
+                          margin: 15px 0 !important;
+                          font-style: italic !important;
+                          font-size: 11px !important;
+                          text-align: center !important;
+                          padding: 8px !important;
+                          border: 1px dashed black !important;
+                          color: black !important;
+                        }
+                        
+                        .signatures {
+                          width: 100% !important;
+                          margin-top: 30px !important;
+                          border-collapse: collapse !important;
+                        }
+                        
+                        .signature {
+                          width: 50% !important;
+                          text-align: center !important;
+                          padding: 20px 10px !important;
+                          font-size: 11px !important;
+                          color: black !important;
+                        }
+                        
+                        .signature-line {
+                          border-bottom: 1px solid black !important;
+                          height: 40px !important;
+                          margin-bottom: 8px !important;
+                        }
+                        
+                        .footer {
+                          margin-top: 20px !important;
+                          text-align: center !important;
+                          font-size: 10px !important;
+                          color: black !important;
+                          border-top: 1px solid black !important;
+                          padding-top: 8px !important;
+                        }
+                      }
                     `;
 
-                    printWindow.document.write(htmlContent);
-                    printWindow.document.close();
-                    printWindow.focus();
-                    setTimeout(() => {
-                      printWindow.print();
-                    }, 500);
+                    // Add elements to the page
+                    document.head.appendChild(printStyles);
+                    document.body.appendChild(printElement);
+
+                    // Trigger print
+                    window.print();
+
+                    // Clean up after printing
+                    const cleanup = () => {
+                      if (printStyles && document.head.contains(printStyles)) {
+                        document.head.removeChild(printStyles);
+                      }
+                      if (printElement && document.body.contains(printElement)) {
+                        document.body.removeChild(printElement);
+                      }
+                      window.removeEventListener('afterprint', cleanup);
+                      window.removeEventListener('beforeunload', cleanup);
+                    };
+
+                    window.addEventListener('afterprint', cleanup);
+                    window.addEventListener('beforeunload', cleanup);
                   };
                   exportFilteredPayslips();
                 }}
-                disabled={filterPayslips(payslips, dashboardSearchQuery).length === 0}
+                disabled={filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length === 0}
                 className={`px-3 py-2 rounded text-sm flex items-center gap-1 transition-colors min-h-touch ${
-                  filterPayslips(payslips, dashboardSearchQuery).length === 0 
+                  filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length === 0 
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                     : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
               >
                 <Download className="h-4 w-4" />
-                <span className="hidden xs:inline">Export {dashboardSearchQuery ? 'Filtered ' : 'All '}PDF</span>
+                <span className="hidden xs:inline">Export {dashboardSearchQuery ? 'Filtered ' : 'Period '}PDF</span>
                 <span className="xs:hidden">Export</span>
               </button>
               <button
@@ -1028,7 +1622,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         
         {/* Mobile Cards View (hidden on md and up) */}
         <div className="md:hidden">
-          {filterPayslips(payslips, dashboardSearchQuery).map((payslip) => {
+          {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).map((payslip) => {
             const calculatedPayslip = calculatePayslip(payslip);
             return (
               <div key={payslip.id} className="bg-white border-b border-gray-200 p-4">
@@ -1041,7 +1635,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     </div>
                     <div className="ml-3 flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-900 truncate">{payslip.name}</div>
-                      <div className="text-xs text-gray-500">{payslip.id}</div>
+                      <div className="text-xs text-gray-500">{payslip.employeeId}</div>
                     </div>
                   </div>
                   <span className="inline-flex px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800 flex-shrink-0">
@@ -1102,7 +1696,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </div>
             );
           })}
-          {filterPayslips(payslips, dashboardSearchQuery).length === 0 && payslips.length > 0 && dashboardSearchQuery && (
+          {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length === 0 && payslips.length > 0 && dashboardSearchQuery && (
             <div className="p-8 text-center">
               <div className="flex flex-col items-center">
                 <Search className="h-12 w-12 text-gray-400 mb-4" />
@@ -1184,7 +1778,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filterPayslips(payslips, dashboardSearchQuery).map((payslip) => {
+              {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).map((payslip) => {
                 const calculatedPayslip = calculatePayslip(payslip);
                 return (
                   <tr key={payslip.id} className="hover:bg-gray-50 transition-colors">
@@ -1197,7 +1791,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                         </div>
                         <div className="ml-2 min-w-0 flex-1">
                           <div className="text-sm font-medium text-gray-900 truncate">{payslip.name}</div>
-                          <div className="text-xs text-gray-500">{payslip.id}</div>
+                          <div className="text-xs text-gray-500">{payslip.employeeId}</div>
                         </div>
                       </div>
                     </td>
@@ -1256,7 +1850,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                   </tr>
                 );
               })}
-              {filterPayslips(payslips, dashboardSearchQuery).length === 0 && payslips.length > 0 && dashboardSearchQuery && (
+              {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length === 0 && payslips.length > 0 && dashboardSearchQuery && (
                 <tr>
                   <td colSpan="8" className="px-3 py-8 text-center">
                     <div className="flex flex-col items-center">
@@ -1298,31 +1892,31 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         </div>
 
         {/* Table Footer with Summary */}
-        {filterPayslips(payslips, dashboardSearchQuery).length > 0 && (
+        {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length > 0 && (
           <div className="px-3 sm:px-4 py-3 border-t border-gray-200 bg-gray-50">
             <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center text-xs">
               <div className="text-gray-600">
-                {dashboardSearchQuery && filterPayslips(payslips, dashboardSearchQuery).length !== payslips.length ? (
-                  <span>{filterPayslips(payslips, dashboardSearchQuery).length} of {payslips.length} payslip{payslips.length !== 1 ? 's' : ''} • {payrollData.payPeriod}</span>
+                {dashboardSearchQuery && filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length !== (currentFilterPeriod ? filterPayslipsByPeriod(payslips, currentFilterPeriod).length : payslips.length) ? (
+                  <span>{filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length} of {currentFilterPeriod ? filterPayslipsByPeriod(payslips, currentFilterPeriod).length : payslips.length} payslip{(currentFilterPeriod ? filterPayslipsByPeriod(payslips, currentFilterPeriod).length : payslips.length) !== 1 ? 's' : ''} • {currentFilterPeriod || 'All Periods'}</span>
                 ) : (
-                  <span>{filterPayslips(payslips, dashboardSearchQuery).length} payslip{filterPayslips(payslips, dashboardSearchQuery).length !== 1 ? 's' : ''} • {payrollData.payPeriod}</span>
+                  <span>{filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length} payslip{filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).length !== 1 ? 's' : ''} • {currentFilterPeriod || 'All Periods'}</span>
                 )}
               </div>
               <div className="flex flex-col xs:flex-row xs:items-center gap-2 xs:gap-4 text-gray-600">
                 <span>Total: <span className="font-semibold text-gray-900">
-                  {filterPayslips(payslips, dashboardSearchQuery).reduce((sum, payslip) => {
+                  {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).reduce((sum, payslip) => {
                     const calculatedPayslip = calculatePayslip(payslip);
                     return sum + calculatedPayslip.totalEarnings;
                   }, 0).toFixed(0)}
                 </span></span>
                 <span>Deductions: <span className="font-semibold text-red-600">
-                  {filterPayslips(payslips, dashboardSearchQuery).reduce((sum, payslip) => {
+                  {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).reduce((sum, payslip) => {
                     const calculatedPayslip = calculatePayslip(payslip);
                     return sum + calculatedPayslip.totalDeductions;
                   }, 0).toFixed(0)}
                 </span></span>
                 <span>Net: <span className="font-semibold text-green-600">
-                  {filterPayslips(payslips, dashboardSearchQuery).reduce((sum, payslip) => {
+                  {filterPayslips(payslips, dashboardSearchQuery, currentFilterPeriod).reduce((sum, payslip) => {
                     const calculatedPayslip = calculatePayslip(payslip);
                     return sum + calculatedPayslip.netPay;
                   }, 0).toFixed(0)}
@@ -1333,10 +1927,11 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   const renderAddPayslip = () => {
-    const selectedEmployeeData = employeeDatabase.find(emp => emp.id === newPayslip.employeeId);
+    const selectedEmployeeData = employeeDatabase.find(emp => emp.id === selectedEmployeeForPayslip);
 
     return (
       <div className="max-w-4xl mx-auto bg-white rounded border border-gray-300 shadow-sm p-6">
@@ -1346,8 +1941,8 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">Select Employee</label>
           <select
-            value={newPayslip.employeeId}
-            onChange={(e) => setNewPayslip({...newPayslip, employeeId: e.target.value})}
+            value={selectedEmployeeForPayslip}
+            onChange={(e) => setSelectedEmployeeForPayslip(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Choose an employee...</option>
@@ -1357,6 +1952,47 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Pay Period Selection */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Pay Period</label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Month & Year</label>
+              <select
+                value={payslipFormData.payPeriod}
+                onChange={(e) => setPayslipFormData({ ...payslipFormData, payPeriod: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {getCurrentYearMonths().map(period => (
+                  <option key={period} value={period}>{period}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Worked Days</label>
+              <input
+                type="number"
+                min="1"
+                max="31"
+                value={payslipFormData.workedDays}
+                onChange={(e) => setPayslipFormData({ ...payslipFormData, workedDays: parseInt(e.target.value) || 0 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Total Days</label>
+              <input
+                type="number"
+                min="1"
+                max="31"
+                value={payslipFormData.totalDays}
+                onChange={(e) => setPayslipFormData({ ...payslipFormData, totalDays: parseInt(e.target.value) || 0 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Employee Information Display */}
@@ -1562,14 +2198,14 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
         <div className="flex space-x-4 mt-6">
           <button
             onClick={addPayslip}
-            disabled={!newPayslip.employeeId}
+            disabled={!selectedEmployeeForPayslip || isCreatingPayslip}
             className={`px-6 py-2 rounded font-medium transition-colors ${
-              newPayslip.employeeId 
+              selectedEmployeeForPayslip && !isCreatingPayslip
                 ? 'bg-blue-600 text-white hover:bg-blue-700' 
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
-            Create Payslip
+            {isCreatingPayslip ? 'Creating...' : 'Create Payslip'}
           </button>
           <button
             onClick={() => setCurrentView('dashboard')}
@@ -1598,7 +2234,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             ← Back to Dashboard
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={() => printSinglePayslip(selectedEmployee)}
             className="btn-primary flex items-center gap-2"
           >
             <Download className="h-5 w-5" />
@@ -1617,46 +2253,56 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Employee Number:</span>
-                <span className="text-secondary-900">{selectedEmployee.id}</span>
+                <span className="text-secondary-900">{selectedEmployee.employeeId || selectedEmployee.id || selectedEmployee.employee?.id || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Date of Joining:</span>
-                <span className="text-secondary-900">{selectedEmployee.dateOfJoining}</span>
+                <span className="text-secondary-900">{selectedEmployee.dateOfJoining || selectedEmployee.employee?.dateOfJoining || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Pay Period:</span>
-                <span className="text-secondary-900">{payrollData.payPeriod}</span>
+                <span className="text-secondary-900">{selectedEmployee.payPeriod || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Worked Days:</span>
-                <span className="text-secondary-900">{payrollData.workedDays}</span>
+                <span className="text-secondary-900">{selectedEmployee.workedDays || selectedEmployee.totalDays || 'N/A'}</span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center">
+                <span className="font-semibold text-secondary-700 w-40">Total Days:</span>
+                <span className="text-secondary-900">{selectedEmployee.totalDays || 'N/A'}</span>
               </div>
             </div>
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Employee Name:</span>
-                <span className="text-secondary-900">{selectedEmployee.name}</span>
+                <span className="text-secondary-900">{selectedEmployee.name || selectedEmployee.employee?.name || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">Gender:</span>
-                <span className="text-secondary-900">{selectedEmployee.gender}</span>
+                <span className="text-secondary-900">{selectedEmployee.gender || selectedEmployee.employee?.gender || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">NRC:</span>
-                <span className="text-secondary-900">{selectedEmployee.nrc}</span>
+                <span className="text-secondary-900">{selectedEmployee.nrc || selectedEmployee.employee?.nrc || 'N/A'}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center">
                 <span className="font-semibold text-secondary-700 w-40">SSN:</span>
-                <span className="text-secondary-900">{selectedEmployee.ssn}</span>
+                <span className="text-secondary-900">{selectedEmployee.ssn || selectedEmployee.employee?.ssn || 'N/A'}</span>
               </div>
             </div>
           </div>
 
-          <div className="mb-6">
+          <div className="mb-6 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center">
               <span className="font-semibold text-secondary-700 w-32">Designation:</span>
               <span className="inline-flex px-3 py-1 text-sm font-medium bg-primary-100 text-primary-800 rounded-full">
-                {selectedEmployee.designation}
+                {selectedEmployee.designation || selectedEmployee.employee?.designation || 'N/A'}
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center">
+              <span className="font-semibold text-secondary-700 w-32">Department:</span>
+              <span className="inline-flex px-3 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded-full">
+                {selectedEmployee.department || selectedEmployee.employee?.department || 'N/A'}
               </span>
             </div>
           </div>
@@ -1675,65 +2321,65 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               <tbody>
                 <tr className="border-b border-secondary-300 hover:bg-secondary-50">
                   <td className="border-r border-secondary-300 p-4">Basic</td>
-                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {selectedEmployee.basicPay.toFixed(2)}</td>
+                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {(selectedEmployee.basicPay || selectedEmployee.employee?.basicPay || 0).toFixed(2)}</td>
                   <td className="border-r border-secondary-300 p-4">NAPSA</td>
-                  <td className="p-4 font-medium">ZMW {selectedEmployee.deductions.napsa.toFixed(2)}</td>
+                  <td className="p-4 font-medium">ZMW {(selectedEmployee.deductions?.napsa || 0).toFixed(2)}</td>
                 </tr>
                 <tr className="border-b border-secondary-300 hover:bg-secondary-50">
                   <td className="border-r border-secondary-300 p-4">Transport Allowance</td>
-                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {selectedEmployee.transportAllowance.toFixed(2)}</td>
+                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {(selectedEmployee.transportAllowance || selectedEmployee.employee?.transportAllowance || 0).toFixed(2)}</td>
                   <td className="border-r border-secondary-300 p-4">NHIMA</td>
-                  <td className="p-4 font-medium">ZMW {selectedEmployee.deductions.nhima.toFixed(2)}</td>
+                  <td className="p-4 font-medium">ZMW {(selectedEmployee.deductions?.nhima || 0).toFixed(2)}</td>
                 </tr>
                 <tr className="border-b border-secondary-300 hover:bg-secondary-50">
                   <td className="border-r border-secondary-300 p-4">House Rent Allowance</td>
-                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {selectedEmployee.houseRentAllowance.toFixed(2)}</td>
+                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {(selectedEmployee.houseRentAllowance || 0).toFixed(2)}</td>
                   <td className="border-r border-secondary-300 p-4">Loan</td>
-                  <td className="p-4 font-medium">ZMW {selectedEmployee.deductions.loan.toFixed(2)}</td>
+                  <td className="p-4 font-medium">ZMW {(selectedEmployee.deductions?.loan || 0).toFixed(2)}</td>
                 </tr>
                 <tr className="border-b border-secondary-300 hover:bg-secondary-50">
                   <td className="border-r border-secondary-300 p-4">Meal Allowance</td>
-                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {selectedEmployee.mealAllowance > 0 ? selectedEmployee.mealAllowance.toFixed(2) : '-'}</td>
+                  <td className="border-r border-secondary-300 p-4 font-medium">ZMW {((selectedEmployee.mealAllowance || selectedEmployee.employee?.mealAllowance || 0) > 0 ? (selectedEmployee.mealAllowance || selectedEmployee.employee?.mealAllowance || 0).toFixed(2) : '0.00')}</td>
                   <td className="border-r border-secondary-300 p-4"></td>
                   <td className="p-4"></td>
                 </tr>
                 {/* Other Earnings */}
-                {selectedEmployee.otherEarnings && selectedEmployee.otherEarnings.map((earning, index) => (
+                {selectedEmployee.otherEarnings && selectedEmployee.otherEarnings.length > 0 && selectedEmployee.otherEarnings.map((earning, index) => (
                   <tr key={`earning-${index}`} className="border-b border-secondary-300 hover:bg-secondary-50">
-                    <td className="border-r border-secondary-300 p-4">{earning.name}</td>
-                    <td className="border-r border-secondary-300 p-4 font-medium">ZMW {earning.amount.toFixed(2)}</td>
+                    <td className="border-r border-secondary-300 p-4">{earning.name || 'Other Earning'}</td>
+                    <td className="border-r border-secondary-300 p-4 font-medium">ZMW {(earning.amount || 0).toFixed(2)}</td>
                     <td className="border-r border-secondary-300 p-4"></td>
                     <td className="p-4"></td>
                   </tr>
                 ))}
                 {/* Other Deductions */}
-                {selectedEmployee.otherDeductions && selectedEmployee.otherDeductions.map((deduction, index) => (
+                {selectedEmployee.otherDeductions && selectedEmployee.otherDeductions.length > 0 && selectedEmployee.otherDeductions.map((deduction, index) => (
                   <tr key={`deduction-${index}`} className="border-b border-secondary-300 hover:bg-secondary-50">
                     <td className="border-r border-secondary-300 p-4"></td>
                     <td className="border-r border-secondary-300 p-4"></td>
-                    <td className="border-r border-secondary-300 p-4">{deduction.name}</td>
-                    <td className="p-4 font-medium">ZMW {deduction.amount.toFixed(2)}</td>
+                    <td className="border-r border-secondary-300 p-4">{deduction.name || 'Other Deduction'}</td>
+                    <td className="p-4 font-medium">ZMW {(deduction.amount || 0).toFixed(2)}</td>
                   </tr>
                 ))}
                 <tr className="border-b-2 border-secondary-800 font-bold bg-secondary-100">
                   <td className="border-r border-secondary-800 p-4">Total Earnings</td>
-                  <td className="border-r border-secondary-800 p-4">ZMW {selectedEmployee.totalEarnings.toFixed(2)}</td>
+                  <td className="border-r border-secondary-800 p-4">ZMW {(selectedEmployee.totalEarnings || 0).toFixed(2)}</td>
                   <td className="border-r border-secondary-800 p-4">Total Deductions</td>
-                  <td className="p-4">ZMW {selectedEmployee.totalDeductions.toFixed(2)}</td>
+                  <td className="p-4">ZMW {(selectedEmployee.totalDeductions || 0).toFixed(2)}</td>
                 </tr>
                 <tr className="font-bold bg-success-50">
                   <td className="border-r border-secondary-800 p-4"></td>
                   <td className="border-r border-secondary-800 p-4"></td>
                   <td className="border-r border-secondary-800 p-4 text-success-700">Net Pay</td>
-                  <td className="p-4 text-success-700 text-lg">ZMW {selectedEmployee.netPay.toFixed(2)}</td>
+                  <td className="p-4 text-success-700 text-lg">ZMW {(selectedEmployee.netPay || 0).toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           <div className="text-center mb-8 p-6 bg-gradient-to-r from-success-50 to-success-100 rounded-2xl border border-success-200">
-            <p className="text-2xl lg:text-3xl font-bold text-success-700 mb-2">ZMW {selectedEmployee.netPay.toFixed(2)}</p>
-            <p className="text-sm text-secondary-600 italic">{numberToWords(selectedEmployee.netPay)}</p>
+            <p className="text-2xl lg:text-3xl font-bold text-success-700 mb-2">ZMW {(selectedEmployee.netPay || 0).toFixed(2)}</p>
+            <p className="text-sm text-secondary-600 italic">{numberToWords(selectedEmployee.netPay || 0)}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-8">
@@ -1757,7 +2403,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
     // Calculate comprehensive wage bill analytics
     const wageBillAnalytics = () => {
       const payslipsByPeriod = payslips.reduce((acc, payslip) => {
-        const period = payslip.payrollPeriod;
+        const period = payslip.payPeriod;
         if (!acc[period]) {
           acc[period] = [];
         }
@@ -2400,7 +3046,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                         <tbody>
                           ${calculatedPayslips.map(payslip => `
                             <tr>
-                              <td>${payslip.payrollPeriod || 'N/A'}</td>
+                              <td>${payslip.payPeriod || 'N/A'}</td>
                               <td class="employee-name">${payslip.name}</td>
                               <td class="amount">ZMW ${payslip.basicPay.toFixed(2)}</td>
                               <td class="amount">ZMW ${(payslip.transportAllowance + payslip.houseRentAllowance + payslip.mealAllowance + (payslip.otherEarningsTotal || 0)).toFixed(2)}</td>
@@ -2982,7 +3628,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </div>
               {dataManagementPayslipSearch && (
                 <div className="mt-2 text-sm text-gray-600">
-                  Found {filterPayslips(payslips, dataManagementPayslipSearch).length} of {payslips.length} payslips
+                  Found {filterPayslips(payslips, dataManagementPayslipSearch, null).length} of {payslips.length} payslips
                 </div>
               )}
             </div>
@@ -3020,19 +3666,19 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                 {dataManagementPayslipSearch && (
                   <div>
                     <h5 className="text-sm font-medium text-gray-700 mb-2">
-                      Payslips ({filterPayslips(payslips, dataManagementPayslipSearch).length})
+                      Payslips ({filterPayslips(payslips, dataManagementPayslipSearch, null).length})
                     </h5>
-                    {filterPayslips(payslips, dataManagementPayslipSearch).length > 0 ? (
+                    {filterPayslips(payslips, dataManagementPayslipSearch, null).length > 0 ? (
                       <div className="space-y-1 max-h-32 overflow-y-auto">
-                        {filterPayslips(payslips, dataManagementPayslipSearch).slice(0, 5).map((payslip) => (
+                        {filterPayslips(payslips, dataManagementPayslipSearch, null).slice(0, 5).map((payslip) => (
                           <div key={payslip.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
                             <span className="font-medium">{payslip.name}</span>
                             <span className="text-gray-500">{payslip.payPeriod || payslip.payrollPeriod} • {payslip.designation}</span>
                           </div>
                         ))}
-                        {filterPayslips(payslips, dataManagementPayslipSearch).length > 5 && (
+                        {filterPayslips(payslips, dataManagementPayslipSearch, null).length > 5 && (
                           <div className="text-xs text-gray-500 text-center pt-1">
-                            ...and {filterPayslips(payslips, dataManagementPayslipSearch).length - 5} more
+                            ...and {filterPayslips(payslips, dataManagementPayslipSearch, null).length - 5} more
                           </div>
                         )}
                       </div>
@@ -3284,7 +3930,21 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
       {/* Beautiful Notification Modals */}
       <SuccessModal
         isOpen={modals.success.isOpen}
-        onClose={() => closeModal('success')}
+        onClose={() => {
+          closeModal('success');
+          // Auto-navigate after certain successful operations
+          if (currentView === 'addPayslip') {
+            setCurrentView('dashboard');
+          }
+          // Navigate to dashboard after data export success
+          if (currentView === 'dataManagement' && modals.success.title === 'Data Exported') {
+            setCurrentView('dashboard');
+          }
+          // If employee form is open after successful creation, close it
+          if (showEmployeeForm) {
+            setShowEmployeeForm(false);
+          }
+        }}
         title={modals.success.title}
         message={modals.success.message}
       />

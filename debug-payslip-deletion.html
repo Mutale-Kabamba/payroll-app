@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Payslip Deletion</title>
+</head>
+<body>
+    <h1>Debug Payslip Deletion</h1>
+    <button onclick="testDeletion()">Test Payslip Deletion</button>
+    <button onclick="clearAllData()">Clear All Local Data</button>
+    <button onclick="showLocalStorage()">Show Local Storage</button>
+    <div id="output"></div>
+
+    <script type="module">
+        // This will help us debug the deletion process
+        async function testDeletion() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h3>Testing Payslip Deletion...</h3>';
+            
+            try {
+                // Import the services
+                const { default: SyncDatabaseService } = await import('./src/services/SyncDatabaseService.js');
+                const syncService = new SyncDatabaseService();
+                
+                // Get current payslips
+                const payslips = await syncService.getPayslips();
+                console.log('Current payslips:', payslips);
+                output.innerHTML += `<p>Found ${payslips.length} payslips</p>`;
+                
+                if (payslips.length > 0) {
+                    const payslipToDelete = payslips[0];
+                    output.innerHTML += `<p>Deleting payslip: ${payslipToDelete.id}</p>`;
+                    
+                    // Delete the payslip
+                    await syncService.deletePayslip(payslipToDelete.id);
+                    output.innerHTML += `<p>Deletion command sent</p>`;
+                    
+                    // Wait a moment
+                    setTimeout(async () => {
+                        const updatedPayslips = await syncService.getPayslips();
+                        console.log('Updated payslips:', updatedPayslips);
+                        output.innerHTML += `<p>After deletion: ${updatedPayslips.length} payslips</p>`;
+                        
+                        const stillExists = updatedPayslips.find(p => p.id === payslipToDelete.id);
+                        if (stillExists) {
+                            output.innerHTML += `<p style="color: red;">ERROR: Payslip still exists!</p>`;
+                        } else {
+                            output.innerHTML += `<p style="color: green;">SUCCESS: Payslip deleted!</p>`;
+                        }
+                    }, 3000);
+                } else {
+                    output.innerHTML += `<p>No payslips to delete</p>`;
+                }
+            } catch (error) {
+                console.error('Error testing deletion:', error);
+                output.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        function clearAllData() {
+            localStorage.clear();
+            document.getElementById('output').innerHTML = '<p>All local storage cleared</p>';
+        }
+        
+        function showLocalStorage() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h3>Local Storage Contents:</h3>';
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                output.innerHTML += `<p><strong>${key}:</strong> ${value.substring(0, 100)}...</p>`;
+            }
+        }
+        
+        // Make functions global
+        window.testDeletion = testDeletion;
+        window.clearAllData = clearAllData;
+        window.showLocalStorage = showLocalStorage;
+    </script>
+</body>
+</html>
