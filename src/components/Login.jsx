@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Lock, User, Building, Shield } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, Building, Shield, Mail } from 'lucide-react';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../services/firebaseConfig';
 
 const Login = ({ onLogin, setupData }) => {
   const [formData, setFormData] = useState({
@@ -10,6 +13,10 @@ const Login = ({ onLogin, setupData }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotMessage, setForgotMessage] = useState('');
+  const [isSubmittingForgot, setIsSubmittingForgot] = useState(false);
 
   // Demo credentials for testing
   const demoCredentials = [
@@ -36,29 +43,41 @@ const Login = ({ onLogin, setupData }) => {
     setIsLoading(true);
     setError('');
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // Check credentials against demo accounts and setup admin
-    let user = demoCredentials.find(
-      cred => cred.username === formData.username && cred.password === formData.password
-    );
-
-    // Also check against setup admin credentials
-    if (!user && setupData?.adminEmail && setupData?.adminPassword) {
-      if (formData.username === setupData.adminEmail && formData.password === setupData.adminPassword) {
-        user = {
-          username: setupData.adminEmail,
-          role: setupData.adminRole || 'Administrator'
-        };
+    try {
+      let email = formData.username;
+      
+      // If username is not an email, try to find the user by username in setup data or Firestore
+      if (!formData.username.includes('@')) {
+        // Check setup data first for the admin user
+        if (setupData?.adminUsername === formData.username) {
+          email = setupData.adminEmail;
+        } else {
+          // For now, we'll require email for login until we implement username lookup
+          throw new Error('Please use your email address to login');
+        }
       }
-    }
 
-    if (user) {
+      // Sign in with Firebase Auth
+      const userCredential = await signInWithEmailAndPassword(auth, email, formData.password);
+      const firebaseUser = userCredential.user;
+
+      // Get user profile from Firestore
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      
+      if (!userDoc.exists()) {
+        throw new Error('User profile not found');
+      }
+
+      const userData = userDoc.data();
+      
       // Store login state
       const loginData = {
-        username: user.username,
-        role: user.role,
+        uid: firebaseUser.uid,
+        username: userData.username,
+        name: userData.name,
+        email: firebaseUser.email,
+        role: userData.role,
+        companyId: userData.companyId,
         loginTime: new Date().toISOString(),
         rememberMe: formData.rememberMe
       };
@@ -70,11 +89,39 @@ const Login = ({ onLogin, setupData }) => {
       }
 
       onLogin(loginData);
-    } else {
-      setError('Invalid username or password. Please try again.');
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error.message || 'Login failed. Please check your credentials.');
     }
 
     setIsLoading(false);
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    setIsSubmittingForgot(true);
+    setError('');
+    setForgotMessage('');
+
+    try {
+      await sendPasswordResetEmail(auth, forgotEmail);
+      setForgotMessage('Password reset email sent! Please check your inbox.');
+      setTimeout(() => {
+        setShowForgotPassword(false);
+        setForgotEmail('');
+        setForgotMessage('');
+      }, 3000);
+    } catch (error) {
+      console.error('Password reset error:', error);
+      setError(error.message || 'Failed to send password reset email');
+    }
+
+    setIsSubmittingForgot(false);
   };
 
   // Removed unused handleDemoLogin function
@@ -198,6 +245,7 @@ const Login = ({ onLogin, setupData }) => {
                 </div>
                 <button
                   type="button"
+                  onClick={() => setShowForgotPassword(true)}
                   className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                 >
                   Forgot password?
@@ -263,6 +311,69 @@ const Login = ({ onLogin, setupData }) => {
           <span className="text-sm">Secure Login Protected</span>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all duration-300 scale-100">
+            <div className="p-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <Mail className="h-5 w-5 mr-2 text-blue-600" />
+                Reset Password
+              </h3>
+              
+              {forgotMessage ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                  <p className="text-green-700 text-sm">{forgotMessage}</p>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword}>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter your email address"
+                      required
+                    />
+                  </div>
+                  
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                      <p className="text-red-700 text-sm">{error}</p>
+                    </div>
+                  )}
+                  
+                  <div className="flex space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotPassword(false);
+                        setForgotEmail('');
+                        setError('');
+                      }}
+                      className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingForgot}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                      {isSubmittingForgot ? 'Sending...' : 'Send Reset Email'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

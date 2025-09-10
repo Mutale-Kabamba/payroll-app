@@ -29,11 +29,8 @@ const AppContent = () => {
 
   // Handle different app states and routing
   const handleGetStarted = () => {
-    if (!isSetupComplete) {
-      setCurrentView('setup');
-    } else {
-      setCurrentView('login');
-    }
+    // Always go to setup regardless of completion status
+    setCurrentView('setup');
   };
 
   const handleSetupComplete = (setupInfo) => {
