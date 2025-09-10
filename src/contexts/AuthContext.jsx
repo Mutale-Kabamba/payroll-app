@@ -1,4 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../services/firebaseConfig';
 
 const AuthContext = createContext();
 
@@ -7,8 +10,42 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing login on app start
-    checkExistingLogin();
+    // Listen to Firebase Auth state changes
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          // Get user profile from Firestore
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            const loginData = {
+              uid: firebaseUser.uid,
+              username: userData.username,
+              name: userData.name,
+              email: firebaseUser.email,
+              role: userData.role,
+              companyId: userData.companyId,
+              loginTime: new Date().toISOString()
+            };
+            setUser(loginData);
+          } else {
+            // User exists in Firebase Auth but not in Firestore
+            console.warn('User profile not found in Firestore');
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+          setUser(null);
+        }
+      } else {
+        // Check for existing login in storage (for demo compatibility)
+        checkExistingLogin();
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const checkExistingLogin = () => {
@@ -31,8 +68,6 @@ export const AuthProvider = ({ children }) => {
       // Clear invalid data
       localStorage.removeItem('payroll_login');
       sessionStorage.removeItem('payroll_login');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -40,7 +75,15 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      // Sign out from Firebase Auth
+      await signOut(auth);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+    
+    // Clear local storage
     setUser(null);
     localStorage.removeItem('payroll_login');
     sessionStorage.removeItem('payroll_login');

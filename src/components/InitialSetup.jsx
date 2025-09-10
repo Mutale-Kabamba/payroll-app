@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { Building, User, MapPin, Phone, Mail, Check, ArrowLeft, ArrowRight, Settings, Briefcase, Users, Upload, FileSpreadsheet } from 'lucide-react';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../services/firebaseConfig';
+import SetupCompletionModal from './SetupCompletionModal';
 
 const InitialSetup = ({ onComplete, onBack }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -14,6 +18,7 @@ const InitialSetup = ({ onComplete, onBack }) => {
     
     // Admin User
     adminName: '',
+    adminUsername: '',
     adminEmail: '',
     adminPhone: '',
     adminRole: 'Administrator',
@@ -39,6 +44,7 @@ const InitialSetup = ({ onComplete, onBack }) => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
 
   // CSV parsing helper function
   const parseCSV = (csvText) => {
@@ -147,11 +153,93 @@ const InitialSetup = ({ onComplete, onBack }) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate setup process
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      // Create Firebase user account
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        formData.adminEmail, 
+        formData.adminPassword
+      );
+      const user = userCredential.user;
+      
+      // Generate company ID
+      const companyId = `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Create company document in Firebase
+      await setDoc(doc(db, 'companies', companyId), {
+        companyName: formData.companyName,
+        companyAddress: formData.companyAddress || '',
+        companyPhone: formData.companyPhone || '',
+        companyEmail: formData.companyEmail,
+        companyWebsite: formData.companyWebsite || '',
+        industry: formData.industry,
+        currency: formData.currency,
+        payFrequency: formData.payFrequency,
+        fiscalYearStart: formData.fiscalYearStart,
+        taxSettings: {
+          enableTax: formData.enableTax,
+          taxRate: parseFloat(formData.taxRate) || 0,
+          enableNapsa: formData.enableNapsa,
+          napsaRate: parseFloat(formData.napsaRate) || 0,
+          enableNhima: formData.enableNhima,
+          nhimaRate: parseFloat(formData.nhimaRate) || 0,
+        },
+        createdAt: new Date().toISOString(),
+        adminUserId: user.uid
+      });
 
-    onComplete(formData);
-    setIsSubmitting(false);
+      // Create admin user profile
+      await setDoc(doc(db, 'users', user.uid), {
+        name: formData.adminName,
+        username: formData.adminUsername,
+        email: formData.adminEmail,
+        phone: formData.adminPhone || '',
+        role: formData.adminRole,
+        companyId: companyId,
+        createdAt: new Date().toISOString()
+      });
+
+      // Import initial employees if any
+      if (formData.employeeSetupChoice === 'now' && formData.initialEmployees.length > 0) {
+        const batch = [];
+        formData.initialEmployees.forEach((employee) => {
+          const employeeId = `emp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          batch.push(
+            setDoc(doc(db, 'employees', employeeId), {
+              ...employee,
+              companyId: companyId,
+              createdAt: new Date().toISOString()
+            })
+          );
+        });
+        await Promise.all(batch);
+      }
+
+      // Add company ID to setup data for the modal
+      const setupDataWithCompany = {
+        ...formData,
+        companyId,
+        firebaseUserId: user.uid
+      };
+
+      // Show completion modal instead of directly calling onComplete
+      setShowCompletionModal(true);
+      setIsSubmitting(false);
+
+      // Store setup data temporarily for the modal and later completion
+      window.tempSetupData = setupDataWithCompany;
+
+    } catch (error) {
+      console.error('Setup error:', error);
+      alert(`Setup failed: ${error.message}`);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCompletionModalClose = () => {
+    setShowCompletionModal(false);
+    onComplete(window.tempSetupData);
+    delete window.tempSetupData;
   };
 
   const isStepValid = (step) => {
@@ -159,7 +247,7 @@ const InitialSetup = ({ onComplete, onBack }) => {
       case 1:
         return formData.companyName && formData.companyEmail && formData.industry;
       case 2:
-        return formData.adminName && formData.adminEmail && formData.adminPassword && 
+        return formData.adminName && formData.adminUsername && formData.adminEmail && formData.adminPassword && 
                formData.confirmPassword && formData.adminPassword === formData.confirmPassword;
       case 3:
         return formData.currency && formData.payFrequency;
@@ -304,6 +392,22 @@ const InitialSetup = ({ onComplete, onBack }) => {
                   placeholder="John Doe"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Username *
+                </label>
+                <input
+                  type="text"
+                  name="adminUsername"
+                  value={formData.adminUsername}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="admin"
+                  required
+                />
+                <p className="text-sm text-gray-500 mt-1">This will be used for login</p>
               </div>
 
               <div>
@@ -738,6 +842,10 @@ const InitialSetup = ({ onComplete, onBack }) => {
                     <span className="ml-2 font-medium">{formData.adminName}</span>
                   </div>
                   <div>
+                    <span className="text-gray-600">Username:</span>
+                    <span className="ml-2 font-medium">{formData.adminUsername}</span>
+                  </div>
+                  <div>
                     <span className="text-gray-600">Email:</span>
                     <span className="ml-2 font-medium">{formData.adminEmail}</span>
                   </div>
@@ -745,7 +853,7 @@ const InitialSetup = ({ onComplete, onBack }) => {
                     <span className="text-gray-600">Role:</span>
                     <span className="ml-2 font-medium">{formData.adminRole}</span>
                   </div>
-                  <div>
+                  <div className="md:col-span-2">
                     <span className="text-gray-600">Password:</span>
                     <span className="ml-2 font-medium">••••••••</span>
                   </div>
@@ -826,8 +934,9 @@ const InitialSetup = ({ onComplete, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden">
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6">
           <div className="flex items-center justify-between">
@@ -936,8 +1045,16 @@ const InitialSetup = ({ onComplete, onBack }) => {
             </button>
           )}
         </div>
+        </div>
       </div>
-    </div>
+
+      {/* Setup Completion Modal */}
+      <SetupCompletionModal 
+        isOpen={showCompletionModal}
+        onClose={handleCompletionModalClose}
+        setupData={formData}
+      />
+    </>
   );
 };
 

@@ -11,7 +11,7 @@ import './index.css';
 
 const AppContent = () => {
   const { user, login, logout, isLoading: authLoading } = useAuth();
-  const { isSetupComplete, setupData, completeSetup, isLoading: setupLoading } = useSetup();
+  const { setupData, completeSetup, isLoading: setupLoading } = useSetup();
   
   const [currentView, setCurrentView] = React.useState('landing'); // landing, setup, login, app
 
@@ -29,11 +29,8 @@ const AppContent = () => {
 
   // Handle different app states and routing
   const handleGetStarted = () => {
-    if (!isSetupComplete) {
-      setCurrentView('setup');
-    } else {
-      setCurrentView('login');
-    }
+    // Always go to setup regardless of completion status
+    setCurrentView('setup');
   };
 
   const handleSetupComplete = (setupInfo) => {
