@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building, User, MapPin, Phone, Mail, Check, ArrowLeft, ArrowRight, Settings, Briefcase } from 'lucide-react';
+import { Building, User, MapPin, Phone, Mail, Check, ArrowLeft, ArrowRight, Settings, Briefcase, Users, Upload, FileSpreadsheet } from 'lucide-react';
 
 const InitialSetup = ({ onComplete, onBack }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -17,6 +17,8 @@ const InitialSetup = ({ onComplete, onBack }) => {
     adminEmail: '',
     adminPhone: '',
     adminRole: 'Administrator',
+    adminPassword: '',
+    confirmPassword: '',
     
     // Payroll Settings
     currency: 'USD',
@@ -29,12 +31,78 @@ const InitialSetup = ({ onComplete, onBack }) => {
     enableNapsa: true,
     napsaRate: '5',
     enableNhima: true,
-    nhimaRate: '3.5'
+    nhimaRate: '3.5',
+    
+    // Employee Setup
+    employeeSetupChoice: 'later', // 'now' or 'later'
+    initialEmployees: []
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const totalSteps = 4;
+  // CSV parsing helper function
+  const parseCSV = (csvText) => {
+    const lines = csvText.trim().split('\n');
+    if (lines.length < 2) return [];
+    
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const employees = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim());
+      if (values.length !== headers.length) continue;
+      
+      const employee = {};
+      headers.forEach((header, index) => {
+        employee[header] = values[index];
+      });
+      
+      // Validate required fields
+      if (employee.name && employee.id && employee.basicpay && employee.designation) {
+        employees.push({
+          id: employee.id,
+          name: employee.name,
+          nrc: employee.nrc || '',
+          ssn: employee.ssn || '',
+          gender: employee.gender || 'Male',
+          designation: employee.designation,
+          dateOfJoining: employee.dateofjoining || '',
+          basicPay: parseFloat(employee.basicpay) || 0,
+          transportAllowance: parseFloat(employee.transportallowance) || 0,
+          mealAllowance: parseFloat(employee.mealallowance) || 0,
+          department: employee.department || '',
+          address: employee.address || '',
+          napsa: employee.napsa || '',
+          nhima: employee.nhima || ''
+        });
+      }
+    }
+    
+    return employees;
+  };
+
+  const handleCSVUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const csvText = e.target.result;
+        const parsedEmployees = parseCSV(csvText);
+        setFormData(prev => ({
+          ...prev,
+          initialEmployees: parsedEmployees
+        }));
+      } catch (error) {
+        console.error('Error parsing CSV:', error);
+        alert('Error parsing CSV file. Please check the format.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const totalSteps = 6;
 
   const industries = [
     'Technology', 'Healthcare', 'Finance', 'Manufacturing', 'Retail', 
@@ -91,10 +159,13 @@ const InitialSetup = ({ onComplete, onBack }) => {
       case 1:
         return formData.companyName && formData.companyEmail && formData.industry;
       case 2:
-        return formData.adminName && formData.adminEmail;
+        return formData.adminName && formData.adminEmail && formData.adminPassword && 
+               formData.confirmPassword && formData.adminPassword === formData.confirmPassword;
       case 3:
         return formData.currency && formData.payFrequency;
       case 4:
+        return true; // Employee setup step is always valid (choice is required but has default)
+      case 5:
         return true; // Review step is always valid
       default:
         return false;
@@ -276,6 +347,39 @@ const InitialSetup = ({ onComplete, onBack }) => {
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
                   readOnly
                 />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  name="adminPassword"
+                  value={formData.adminPassword}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Create a secure password"
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirm Password *
+                </label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Confirm your password"
+                  required
+                />
+                {formData.confirmPassword && formData.adminPassword !== formData.confirmPassword && (
+                  <p className="text-red-600 text-sm mt-1">Passwords do not match</p>
+                )}
               </div>
             </div>
 
@@ -466,6 +570,130 @@ const InitialSetup = ({ onComplete, onBack }) => {
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
+              <div className="bg-indigo-100 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                <Users className="h-10 w-10 text-indigo-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Employee Setup</h2>
+              <p className="text-gray-600">Choose how you want to set up your employees</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div 
+                  className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                    formData.employeeSetupChoice === 'later' 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setFormData(prev => ({ ...prev, employeeSetupChoice: 'later' }))}
+                >
+                  <div className="flex items-center mb-3">
+                    <input
+                      type="radio"
+                      name="employeeSetupChoice"
+                      value="later"
+                      checked={formData.employeeSetupChoice === 'later'}
+                      onChange={handleInputChange}
+                      className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <label className="ml-3 text-lg font-medium text-gray-900">Set up later</label>
+                  </div>
+                  <p className="text-gray-600 text-sm">
+                    Skip employee setup for now. You can add employees manually or import them later from the main application.
+                  </p>
+                  <div className="mt-3 text-xs text-gray-500">
+                    ✓ Start with empty employee database<br/>
+                    ✓ Add employees one by one later<br/>
+                    ✓ Import from CSV later
+                  </div>
+                </div>
+
+                <div 
+                  className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                    formData.employeeSetupChoice === 'now' 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setFormData(prev => ({ ...prev, employeeSetupChoice: 'now' }))}
+                >
+                  <div className="flex items-center mb-3">
+                    <input
+                      type="radio"
+                      name="employeeSetupChoice"
+                      value="now"
+                      checked={formData.employeeSetupChoice === 'now'}
+                      onChange={handleInputChange}
+                      className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <label className="ml-3 text-lg font-medium text-blue-900">Import employees now</label>
+                  </div>
+                  <p className="text-gray-600 text-sm">
+                    Import your employee data from a CSV file during setup. This will populate your system with employee information.
+                  </p>
+                  <div className="mt-3 text-xs text-gray-500">
+                    ✓ Bulk import from CSV<br/>
+                    ✓ Pre-populate employee database<br/>
+                    ✓ Ready to generate payslips immediately
+                  </div>
+                </div>
+              </div>
+
+              {formData.employeeSetupChoice === 'now' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <FileSpreadsheet className="h-5 w-5 mr-2" />
+                    Employee CSV Import
+                  </h4>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Upload Employee CSV File
+                    </label>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleCSVUpload}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <p className="text-sm text-gray-500 mt-2">
+                      Upload a CSV file containing employee data. Required columns: name, id, basicPay, designation
+                    </p>
+                  </div>
+
+                  <div className="bg-white border rounded-lg p-4">
+                    <h5 className="text-sm font-medium text-gray-900 mb-2">CSV Format Requirements:</h5>
+                    <div className="text-xs text-gray-600 space-y-1">
+                      <div><strong>Required columns:</strong> name, id, basicPay, designation</div>
+                      <div><strong>Optional columns:</strong> nrc, ssn, gender, dateOfJoining, transportAllowance, mealAllowance, department, address</div>
+                      <div><strong>Example:</strong> name,id,basicPay,designation,department</div>
+                      <div className="font-mono bg-gray-100 p-2 mt-2 rounded text-xs">
+                        John Doe,EMP001,5000,Manager,IT<br/>
+                        Jane Smith,EMP002,4500,Developer,IT
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-start">
+                <Check className="h-5 w-5 text-green-600 mr-3 mt-0.5" />
+                <div>
+                  <h4 className="text-sm font-medium text-green-900 mb-1">Flexible Setup</h4>
+                  <p className="text-sm text-green-700">
+                    Don't worry about this choice - you can always add, edit, or import employees later from the main application.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 5:
+        return (
+          <div className="space-y-6">
+            <div className="text-center mb-8">
               <div className="bg-orange-100 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
                 <Check className="h-10 w-10 text-orange-600" />
               </div>
@@ -516,6 +744,31 @@ const InitialSetup = ({ onComplete, onBack }) => {
                   <div>
                     <span className="text-gray-600">Role:</span>
                     <span className="ml-2 font-medium">{formData.adminRole}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Password:</span>
+                    <span className="ml-2 font-medium">••••••••</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                  <Users className="h-5 w-5 mr-2" />
+                  Employee Setup
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Setup Choice:</span>
+                    <span className="ml-2 font-medium">
+                      {formData.employeeSetupChoice === 'now' ? 'Import employees during setup' : 'Set up employees later'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Initial Employees:</span>
+                    <span className="ml-2 font-medium">
+                      {formData.employeeSetupChoice === 'now' ? `${formData.initialEmployees.length} employees to import` : 'None (will start blank)'}
+                    </span>
                   </div>
                 </div>
               </div>

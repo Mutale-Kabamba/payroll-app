@@ -39,10 +39,20 @@ const Login = ({ onLogin, setupData }) => {
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // Check credentials
-    const user = demoCredentials.find(
+    // Check credentials against demo accounts and setup admin
+    let user = demoCredentials.find(
       cred => cred.username === formData.username && cred.password === formData.password
     );
+
+    // Also check against setup admin credentials
+    if (!user && setupData?.adminEmail && setupData?.adminPassword) {
+      if (formData.username === setupData.adminEmail && formData.password === setupData.adminPassword) {
+        user = {
+          username: setupData.adminEmail,
+          role: setupData.adminRole || 'Administrator'
+        };
+      }
+    }
 
     if (user) {
       // Store login state
