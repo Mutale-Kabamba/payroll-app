@@ -4,6 +4,9 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebaseConfig';
 import SetupCompletionModal from './SetupCompletionModal';
+import { SuccessModal, ErrorModal, InfoModal } from './Modal';
+import LoadingModal from './LoadingModal';
+import { useNotification } from '../hooks/useNotification';
 
 const InitialSetup = ({ onComplete, onBack }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -45,6 +48,9 @@ const InitialSetup = ({ onComplete, onBack }) => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  
+  // Notification system for better user feedback
+  const { modals, showSuccess, showError, showInfo, showLoading, hideLoading, closeModal } = useNotification();
 
   // CSV parsing helper function
   const parseCSV = (csvText) => {
@@ -152,87 +158,166 @@ const InitialSetup = ({ onComplete, onBack }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    
+    // Show loading modal with detailed message
+    showLoading('Setting up your payroll system...', 'Please Wait');
 
     try {
-      // Create Firebase user account
-      const userCredential = await createUserWithEmailAndPassword(
-        auth, 
-        formData.adminEmail, 
-        formData.adminPassword
-      );
-      const user = userCredential.user;
+      let companyId, firebaseUserId = null;
       
-      // Generate company ID
-      const companyId = `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Create company document in Firebase
-      await setDoc(doc(db, 'companies', companyId), {
-        companyName: formData.companyName,
-        companyAddress: formData.companyAddress || '',
-        companyPhone: formData.companyPhone || '',
-        companyEmail: formData.companyEmail,
-        companyWebsite: formData.companyWebsite || '',
-        industry: formData.industry,
-        currency: formData.currency,
-        payFrequency: formData.payFrequency,
-        fiscalYearStart: formData.fiscalYearStart,
-        taxSettings: {
-          enableTax: formData.enableTax,
-          taxRate: parseFloat(formData.taxRate) || 0,
-          enableNapsa: formData.enableNapsa,
-          napsaRate: parseFloat(formData.napsaRate) || 0,
-          enableNhima: formData.enableNhima,
-          nhimaRate: parseFloat(formData.nhimaRate) || 0,
-        },
-        createdAt: new Date().toISOString(),
-        adminUserId: user.uid
-      });
-
-      // Create admin user profile
-      await setDoc(doc(db, 'users', user.uid), {
-        name: formData.adminName,
-        username: formData.adminUsername,
-        email: formData.adminEmail,
-        phone: formData.adminPhone || '',
-        role: formData.adminRole,
-        companyId: companyId,
-        createdAt: new Date().toISOString()
-      });
-
-      // Import initial employees if any
-      if (formData.employeeSetupChoice === 'now' && formData.initialEmployees.length > 0) {
-        const batch = [];
-        formData.initialEmployees.forEach((employee) => {
-          const employeeId = `emp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          batch.push(
-            setDoc(doc(db, 'employees', employeeId), {
-              ...employee,
-              companyId: companyId,
-              createdAt: new Date().toISOString()
-            })
-          );
+      // Try Firebase setup first, but continue with local setup if it fails
+      try {
+        showLoading('Creating your admin account...', 'Firebase Setup');
+        
+        // Create Firebase user account
+        const userCredential = await createUserWithEmailAndPassword(
+          auth, 
+          formData.adminEmail, 
+          formData.adminPassword
+        );
+        firebaseUserId = userCredential.user.uid;
+        
+        // Generate company ID
+        companyId = `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        showLoading('Configuring company settings...', 'Firebase Setup');
+        
+        // Create company document in Firebase
+        await setDoc(doc(db, 'companies', companyId), {
+          companyName: formData.companyName,
+          companyAddress: formData.companyAddress || '',
+          companyPhone: formData.companyPhone || '',
+          companyEmail: formData.companyEmail,
+          companyWebsite: formData.companyWebsite || '',
+          industry: formData.industry,
+          currency: formData.currency,
+          payFrequency: formData.payFrequency,
+          fiscalYearStart: formData.fiscalYearStart,
+          taxSettings: {
+            enableTax: formData.enableTax,
+            taxRate: parseFloat(formData.taxRate) || 0,
+            enableNapsa: formData.enableNapsa,
+            napsaRate: parseFloat(formData.napsaRate) || 0,
+            enableNhima: formData.enableNhima,
+            nhimaRate: parseFloat(formData.nhimaRate) || 0,
+          },
+          createdAt: new Date().toISOString(),
+          adminUserId: firebaseUserId
         });
-        await Promise.all(batch);
+
+        // Create admin user profile
+        await setDoc(doc(db, 'users', firebaseUserId), {
+          name: formData.adminName,
+          username: formData.adminUsername,
+          email: formData.adminEmail,
+          phone: formData.adminPhone || '',
+          role: formData.adminRole,
+          companyId: companyId,
+          createdAt: new Date().toISOString()
+        });
+
+        // Import initial employees if any
+        if (formData.employeeSetupChoice === 'now' && formData.initialEmployees.length > 0) {
+          showLoading('Importing employee data...', 'Firebase Setup');
+          
+          const batch = [];
+          formData.initialEmployees.forEach((employee) => {
+            const employeeId = `emp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            batch.push(
+              setDoc(doc(db, 'employees', employeeId), {
+                ...employee,
+                companyId: companyId,
+                createdAt: new Date().toISOString()
+              })
+            );
+          });
+          await Promise.all(batch);
+        }
+
+        console.log('✅ Firebase setup completed successfully');
+
+      } catch (firebaseError) {
+        console.warn('Firebase setup failed, continuing with local-only setup:', firebaseError);
+        
+        // Generate local company ID for fallback
+        companyId = `local_company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Show info message about Firebase fallback
+        hideLoading();
+        showInfo(
+          'Firebase cloud sync is not available, but your system will work perfectly with local storage. You can enable cloud sync later in the settings.',
+          'Local Setup Mode'
+        );
+        
+        // Wait for user acknowledgment
+        await new Promise(resolve => {
+          const checkModal = setInterval(() => {
+            if (!modals.info.isOpen) {
+              clearInterval(checkModal);
+              resolve();
+            }
+          }, 100);
+        });
+        
+        showLoading('Finalizing local setup...', 'Setup in Progress');
       }
+
+      hideLoading();
 
       // Add company ID to setup data for the modal
       const setupDataWithCompany = {
         ...formData,
         companyId,
-        firebaseUserId: user.uid
+        firebaseUserId,
+        setupMode: firebaseUserId ? 'cloud' : 'local'
       };
 
-      // Show completion modal instead of directly calling onComplete
+      // Show completion modal
       setShowCompletionModal(true);
       setIsSubmitting(false);
 
-      // Store setup data temporarily for the modal and later completion
+      // Store setup data temporarily for the modal
       window.tempSetupData = setupDataWithCompany;
 
     } catch (error) {
       console.error('Setup error:', error);
-      alert(`Setup failed: ${error.message}`);
+      hideLoading();
       setIsSubmitting(false);
+      
+      // Provide helpful error messages based on error type
+      let errorTitle = 'Setup Failed';
+      let errorMessage = 'An unexpected error occurred during setup. Please try again.';
+      
+      if (error.code) {
+        switch (error.code) {
+          case 'auth/configuration-not-found':
+            errorTitle = 'Firebase Configuration Error';
+            errorMessage = 'Firebase authentication is not properly configured. Please check your Firebase project settings or try the local setup mode instead.';
+            break;
+          case 'auth/email-already-in-use':
+            errorTitle = 'Email Already Registered';
+            errorMessage = 'This email address is already registered. Please use a different email address or try signing in instead.';
+            break;
+          case 'auth/weak-password':
+            errorTitle = 'Password Too Weak';
+            errorMessage = 'Please choose a stronger password with at least 6 characters.';
+            break;
+          case 'auth/invalid-email':
+            errorTitle = 'Invalid Email';
+            errorMessage = 'Please enter a valid email address.';
+            break;
+          case 'auth/network-request-failed':
+            errorTitle = 'Network Error';
+            errorMessage = 'Unable to connect to Firebase. Please check your internet connection and try again.';
+            break;
+          default:
+            errorMessage = `Setup failed: ${error.message}`;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      showError(errorMessage, errorTitle);
     }
   };
 
@@ -1053,6 +1138,34 @@ const InitialSetup = ({ onComplete, onBack }) => {
         isOpen={showCompletionModal}
         onClose={handleCompletionModalClose}
         setupData={formData}
+      />
+
+      {/* Notification Modals */}
+      <SuccessModal
+        isOpen={modals.success.isOpen}
+        onClose={() => closeModal('success')}
+        title={modals.success.title}
+        message={modals.success.message}
+      />
+
+      <ErrorModal
+        isOpen={modals.error.isOpen}
+        onClose={() => closeModal('error')}
+        title={modals.error.title}
+        message={modals.error.message}
+      />
+
+      <InfoModal
+        isOpen={modals.info.isOpen}
+        onClose={() => closeModal('info')}
+        title={modals.info.title}
+        message={modals.info.message}
+      />
+
+      <LoadingModal
+        isOpen={modals.loading.isOpen}
+        title={modals.loading.title}
+        message={modals.loading.message}
       />
     </>
   );
