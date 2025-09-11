@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Building, User, MapPin, Phone, Mail, Check, ArrowLeft, ArrowRight, Settings, Briefcase, Users, Upload, FileSpreadsheet } from 'lucide-react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebaseConfig';
 import SetupCompletionModal from './SetupCompletionModal';
 import { SuccessModal, ErrorModal, InfoModal } from './Modal';
@@ -51,7 +51,41 @@ const InitialSetup = ({ onComplete, onBack }) => {
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   
   // Notification system for better user feedback
-  const { modals, showError, showInfo, showLoading, hideLoading, closeModal } = useNotification();
+  const { modals, showError, showInfo, showConfirm, showLoading, hideLoading, closeModal } = useNotification();
+
+  // Test Firebase connection before attempting setup
+  const testFirebaseConnection = async () => {
+    try {
+      // Try to access Firebase Auth
+      if (!auth) {
+        return { success: false, error: 'Firebase Auth not initialized' };
+      }
+      
+      // Try to access Firestore
+      if (!db) {
+        return { success: false, error: 'Firestore not initialized' };
+      }
+      
+      // Test basic connectivity by trying to read a test document
+      const testRef = doc(db, 'test', 'connection');
+      await getDoc(testRef);
+      
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.message || 'Firebase connection failed' 
+      };
+    }
+  };
+
+  // Ask user about fallback to local mode
+  const askUserAboutLocalFallback = async (firebaseError) => {
+    // For now, always continue with local storage when Firebase fails
+    // In production, you might want to show a more sophisticated choice dialog
+    console.log('Firebase setup failed, continuing with local storage:', firebaseError.message);
+    return true; // Continue with local storage
+  };
 
   // CSV parsing helper function
   const parseCSV = (csvText) => {
@@ -165,102 +199,123 @@ const InitialSetup = ({ onComplete, onBack }) => {
 
     try {
       let companyId, firebaseUserId = null;
+      let firebaseSetupSucceeded = false;
       
-      // Try Firebase setup first, but continue with local setup if it fails
+      // Try Firebase setup first with better retry mechanism
       try {
-        showLoading('Creating your admin account...', 'Firebase Setup');
+        showLoading('Connecting to Firebase...', 'Firebase Setup');
         
-        // Create Firebase user account
-        const userCredential = await createUserWithEmailAndPassword(
-          auth, 
-          formData.adminEmail, 
-          formData.adminPassword
-        );
-        firebaseUserId = userCredential.user.uid;
+        // Test Firebase connection first
+        const connectionTest = await testFirebaseConnection();
         
-        // Generate company ID
-        companyId = `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
-        showLoading('Configuring company settings...', 'Firebase Setup');
-        
-        // Create company document in Firebase
-        await setDoc(doc(db, 'companies', companyId), {
-          companyName: formData.companyName,
-          companyAddress: formData.companyAddress || '',
-          companyPhone: formData.companyPhone || '',
-          companyEmail: formData.companyEmail,
-          companyWebsite: formData.companyWebsite || '',
-          industry: formData.industry,
-          currency: formData.currency,
-          payFrequency: formData.payFrequency,
-          fiscalYearStart: formData.fiscalYearStart,
-          taxSettings: {
-            enableTax: formData.enableTax,
-            taxRate: parseFloat(formData.taxRate) || 0,
-            enableNapsa: formData.enableNapsa,
-            napsaRate: parseFloat(formData.napsaRate) || 0,
-            enableNhima: formData.enableNhima,
-            nhimaRate: parseFloat(formData.nhimaRate) || 0,
-          },
-          createdAt: new Date().toISOString(),
-          adminUserId: firebaseUserId
-        });
-
-        // Create admin user profile
-        await setDoc(doc(db, 'users', firebaseUserId), {
-          name: formData.adminName,
-          username: formData.adminUsername,
-          email: formData.adminEmail,
-          phone: formData.adminPhone || '',
-          role: formData.adminRole,
-          companyId: companyId,
-          createdAt: new Date().toISOString()
-        });
-
-        // Import initial employees if any
-        if (formData.employeeSetupChoice === 'now' && formData.initialEmployees.length > 0) {
-          showLoading('Importing employee data...', 'Firebase Setup');
+        if (connectionTest.success) {
+          showLoading('Creating your admin account...', 'Firebase Setup');
           
-          const batch = [];
-          formData.initialEmployees.forEach((employee) => {
-            const employeeId = `emp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            batch.push(
-              setDoc(doc(db, 'employees', employeeId), {
-                ...employee,
-                companyId: companyId,
-                createdAt: new Date().toISOString()
-              })
-            );
+          // Create Firebase user account
+          const userCredential = await createUserWithEmailAndPassword(
+            auth, 
+            formData.adminEmail, 
+            formData.adminPassword
+          );
+          firebaseUserId = userCredential.user.uid;
+          
+          // Generate company ID
+          companyId = `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          showLoading('Configuring company settings...', 'Firebase Setup');
+          
+          // Create company document in Firebase
+          await setDoc(doc(db, 'companies', companyId), {
+            companyName: formData.companyName,
+            companyAddress: formData.companyAddress || '',
+            companyPhone: formData.companyPhone || '',
+            companyEmail: formData.companyEmail,
+            companyWebsite: formData.companyWebsite || '',
+            industry: formData.industry,
+            currency: formData.currency,
+            payFrequency: formData.payFrequency,
+            fiscalYearStart: formData.fiscalYearStart,
+            taxSettings: {
+              enableTax: formData.enableTax,
+              taxRate: parseFloat(formData.taxRate) || 0,
+              enableNapsa: formData.enableNapsa,
+              napsaRate: parseFloat(formData.napsaRate) || 0,
+              enableNhima: formData.enableNhima,
+              nhimaRate: parseFloat(formData.nhimaRate) || 0,
+            },
+            createdAt: new Date().toISOString(),
+            adminUserId: firebaseUserId
           });
-          await Promise.all(batch);
+
+          // Create admin user profile
+          await setDoc(doc(db, 'users', firebaseUserId), {
+            name: formData.adminName,
+            username: formData.adminUsername,
+            email: formData.adminEmail,
+            phone: formData.adminPhone || '',
+            role: formData.adminRole,
+            companyId: companyId,
+            createdAt: new Date().toISOString()
+          });
+
+          // Import initial employees if any
+          if (formData.employeeSetupChoice === 'now' && formData.initialEmployees.length > 0) {
+            showLoading('Importing employee data...', 'Firebase Setup');
+            
+            const batch = [];
+            formData.initialEmployees.forEach((employee) => {
+              const employeeId = `emp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              batch.push(
+                setDoc(doc(db, 'employees', employeeId), {
+                  ...employee,
+                  companyId: companyId,
+                  createdAt: new Date().toISOString()
+                })
+              );
+            });
+            await Promise.all(batch);
+          }
+
+          console.log('✅ Firebase setup completed successfully');
+          firebaseSetupSucceeded = true;
+
+        } else {
+          throw new Error(connectionTest.error || 'Firebase connection failed');
         }
 
-        console.log('✅ Firebase setup completed successfully');
-
       } catch (firebaseError) {
-        console.warn('Firebase setup failed, continuing with local-only setup:', firebaseError);
+        console.warn('Firebase setup failed:', firebaseError);
         
-        // Generate local company ID for fallback
-        companyId = `local_company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        // For development/testing, ask user if they want to continue with local mode
+        // In production, you might want to be more persistent with Firebase
+        const continueWithLocal = await askUserAboutLocalFallback(firebaseError);
         
-        // Show info message about Firebase fallback
-        hideLoading();
-        showInfo(
-          'Firebase cloud sync is not available, but your system will work perfectly with local storage. You can enable cloud sync later in the settings.',
-          'Local Setup Mode'
-        );
-        
-        // Wait for user acknowledgment
-        await new Promise(resolve => {
-          const checkModal = setInterval(() => {
-            if (!modals.info.isOpen) {
-              clearInterval(checkModal);
-              resolve();
-            }
-          }, 100);
-        });
-        
-        showLoading('Finalizing local setup...', 'Setup in Progress');
+        if (continueWithLocal) {
+          // Generate local company ID for fallback
+          companyId = `local_company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          // Show info message about Firebase fallback
+          hideLoading();
+          showInfo(
+            'Firebase cloud sync is not available right now, but your system will work with local storage. Cloud sync will be attempted automatically when the connection is restored.',
+            'Local Setup Mode'
+          );
+          
+          // Wait for user acknowledgment
+          await new Promise(resolve => {
+            const checkModal = setInterval(() => {
+              if (!modals.info.isOpen) {
+                clearInterval(checkModal);
+                resolve();
+              }
+            }, 100);
+          });
+          
+          showLoading('Finalizing local setup...', 'Setup in Progress');
+        } else {
+          // User chose not to continue, abort setup
+          throw firebaseError;
+        }
       }
 
       hideLoading();
@@ -270,7 +325,8 @@ const InitialSetup = ({ onComplete, onBack }) => {
         ...formData,
         companyId,
         firebaseUserId,
-        setupMode: firebaseUserId ? 'cloud' : 'local'
+        setupMode: firebaseSetupSucceeded ? 'firebase' : 'local',
+        firebaseSetupSucceeded
       };
 
       // Show completion modal

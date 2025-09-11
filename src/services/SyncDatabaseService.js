@@ -8,39 +8,80 @@ class SyncDatabaseService {
     this.localService = databaseService;
     this.isOnline = navigator.onLine;
     this.syncQueue = [];
+    this.retryTimer = null;
+    this.lastSyncAttempt = null;
     
     // Listen for online/offline events
     window.addEventListener('online', () => {
       this.isOnline = true;
+      console.log('🌐 Network connection restored, processing sync queue...');
       this.processSyncQueue();
     });
     
     window.addEventListener('offline', () => {
       this.isOnline = false;
+      console.log('📴 Network connection lost, queuing operations...');
     });
     
-    // Initialize sync
+    // Initialize sync with Firebase-first approach
     this.initializeSync();
   }
 
   async initializeSync() {
     if (this.isOnline) {
       try {
-        // Check if cloud service is available
-        const cloudAvailable = await this.cloudService.isOnline();
+        console.log('🔄 Initializing Firebase-first sync...');
+        // Check if cloud service is available with retries for better reliability
+        const cloudAvailable = await this.checkCloudAvailabilityWithRetry();
         if (cloudAvailable) {
+          console.log('✅ Firebase connection established');
           // Sync local data to cloud on first load
           await this.cloudService.syncLocalToCloud();
+        } else {
+          console.log('⚠️ Firebase not available after retries, will attempt sync later');
         }
-      } catch {
-        console.log('Cloud sync not available, using local storage only');
+      } catch (error) {
+        console.warn('Cloud sync initialization failed:', error);
+        // Don't completely fall back - keep trying periodically
+        this.scheduleRetrySync();
       }
     }
+  }
+
+  // Check cloud availability with retries for better Firebase-first experience
+  async checkCloudAvailabilityWithRetry(maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const isAvailable = await this.cloudService.isOnline();
+        if (isAvailable) return true;
+        
+        if (i < maxRetries - 1) {
+          console.log(`🔄 Firebase retry ${i + 1}/${maxRetries} in 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (error) {
+        console.log(`❌ Firebase attempt ${i + 1} failed:`, error.message);
+        if (i < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+    }
+    return false;
+  }
+
+  // Schedule periodic retry for Firebase connection
+  scheduleRetrySync() {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = setTimeout(async () => {
+      console.log('🔄 Retrying Firebase connection...');
+      await this.initializeSync();
+    }, 30000); // Retry every 30 seconds
   }
 
   // Add operation to sync queue if offline
   addToSyncQueue(operation, data) {
     this.syncQueue.push({ operation, data, timestamp: Date.now() });
+    console.log(`📥 Queued operation: ${operation} (queue size: ${this.syncQueue.length})`);
   }
 
   // Process sync queue when coming back online
@@ -81,56 +122,70 @@ class SyncDatabaseService {
     console.log('Sync queue processed successfully');
   }
 
-  // EMPLOYEE METHODS
+  // EMPLOYEE METHODS - Firebase-first approach
   async getEmployees() {
     try {
       if (this.isOnline) {
         try {
-          // Get employees from cloud (Firebase) only
+          // Always try Firebase first with better error handling
+          console.log('📋 Fetching employees from Firebase...');
           const cloudEmployees = await this.cloudService.getEmployees();
-          console.log('Fetched employees from Firebase:', cloudEmployees);
+          console.log(`✅ Fetched ${cloudEmployees.length} employees from Firebase`);
           
           // Update local storage with cloud data for offline access
-          if (cloudEmployees.length > 0) {
+          if (cloudEmployees.length >= 0) { // Even if empty, sync it
             this.localService.setEmployees(cloudEmployees);
+            console.log('💾 Local storage updated with Firebase data');
           }
           
-          return cloudEmployees; // Return Firebase data only, even if empty
-        } catch {
-          // Cloud error handled silently
+          return cloudEmployees; // Return Firebase data (even if empty)
+        } catch (cloudError) {
+          console.warn('⚠️ Firebase fetch failed, using local fallback:', cloudError.message);
+          // Add to retry queue for later sync
+          this.addToSyncQueue('getEmployees', null);
           return this.localService.getEmployees();
         }
       } else {
-        // When offline, return local data (which should be synced from Firebase)
+        console.log('📴 Offline: using local storage');
         return this.localService.getEmployees();
       }
-    } catch {
-      // Error handled silently
+    } catch (error) {
+      console.error('❌ Error getting employees:', error);
       return this.localService.getEmployees();
     }
   }
 
   async addEmployee(employee) {
     try {
-      // Always save locally first
-      this.localService.addEmployee(employee);
+      console.log('👤 Adding employee:', employee.name);
       
       if (this.isOnline) {
         try {
+          // Try Firebase first with priority
           await this.cloudService.addEmployee(employee);
-        } catch {
-          // Add to sync queue if cloud fails
+          console.log('✅ Employee added to Firebase successfully');
+          
+          // Update local storage after successful Firebase save
+          this.localService.addEmployee(employee);
+          console.log('💾 Employee cached locally');
+          
+          return true;
+        } catch (cloudError) {
+          console.warn('⚠️ Firebase add failed, caching locally:', cloudError.message);
+          // Save locally and queue for sync
+          this.localService.addEmployee(employee);
           this.addToSyncQueue('addEmployee', employee);
+          return true;
         }
       } else {
-        // Add to sync queue for later
+        console.log('📴 Offline: saving employee locally');
+        this.localService.addEmployee(employee);
         this.addToSyncQueue('addEmployee', employee);
+        return true;
       }
-      
-      return true;
-    } catch {
-      // Error handled silently
-      // Error suppressed
+    } catch (error) {
+      console.error('❌ Error adding employee:', error);
+      throw error;
     }
   }
 
@@ -253,47 +308,67 @@ class SyncDatabaseService {
     }
   }
 
-  // SETTINGS METHODS
+  // SETTINGS METHODS - Firebase-first approach
   async getPayrollSettings() {
     try {
       if (this.isOnline) {
-        const cloudSettings = await this.cloudService.getPayrollSettings();
-        // Only update local storage if cloud settings exist
-        if (cloudSettings) {
-          this.localService.setPayrollSettings(cloudSettings);
-          return cloudSettings;
-        } else {
-          // No settings in cloud, return default local settings
+        try {
+          console.log('⚙️ Fetching payroll settings from Firebase...');
+          const cloudSettings = await this.cloudService.getPayrollSettings();
+          
+          if (cloudSettings) {
+            console.log('✅ Payroll settings loaded from Firebase');
+            this.localService.setPayrollSettings(cloudSettings);
+            return cloudSettings;
+          } else {
+            console.log('📋 No settings in Firebase, using local defaults');
+            return this.localService.getPayrollSettings();
+          }
+        } catch (cloudError) {
+          console.warn('⚠️ Firebase settings fetch failed:', cloudError.message);
           return this.localService.getPayrollSettings();
         }
       } else {
+        console.log('📴 Offline: using local settings');
         return this.localService.getPayrollSettings();
       }
-    } catch {
-      // Error handled silently
+    } catch (error) {
+      console.error('❌ Error getting payroll settings:', error);
       return this.localService.getPayrollSettings();
     }
   }
 
   async setPayrollSettings(settings) {
     try {
-      // Always save locally first
-      this.localService.setPayrollSettings(settings);
+      console.log('⚙️ Saving payroll settings:', settings);
       
       if (this.isOnline) {
         try {
+          // Try Firebase first
           await this.cloudService.setPayrollSettings(settings);
-        } catch {
+          console.log('✅ Payroll settings saved to Firebase');
+          
+          // Update local after successful Firebase save
+          this.localService.setPayrollSettings(settings);
+          console.log('💾 Settings cached locally');
+          
+          return true;
+        } catch (cloudError) {
+          console.warn('⚠️ Firebase settings save failed:', cloudError.message);
+          // Save locally and queue for sync
+          this.localService.setPayrollSettings(settings);
           this.addToSyncQueue('setPayrollSettings', settings);
+          return true;
         }
       } else {
+        console.log('📴 Offline: saving settings locally');
+        this.localService.setPayrollSettings(settings);
         this.addToSyncQueue('setPayrollSettings', settings);
+        return true;
       }
-      
-      return true;
-    } catch {
-      // Error handled silently
-      // Error suppressed
+    } catch (error) {
+      console.error('❌ Error setting payroll settings:', error);
+      throw error;
     }
   }
 
