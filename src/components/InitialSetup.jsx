@@ -337,7 +337,7 @@ const InitialSetup = ({ onComplete, onBack }) => {
     if (/[A-Z]/.test(password)) score++;
     if (/[a-z]/.test(password)) score++;
     if (/\d/.test(password)) score++;
-    if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) score++;
+    if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) score++;
     
     return score >= 3; // Require at least 3 out of 5 criteria
   };

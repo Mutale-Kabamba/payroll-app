@@ -29,7 +29,7 @@ export const isFirebaseAvailable = () => {
   try {
     // Test if we can reach Firebase by checking auth state
     return auth !== null;
-  } catch (error) {
+  } catch {
     return false;
   }
 };

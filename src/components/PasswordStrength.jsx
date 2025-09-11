@@ -39,7 +39,7 @@ const PasswordStrength = ({ password, showStrength = true }) => {
     }
     
     // Special character check
-    if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) {
+    if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pwd)) {
       score += 1;
       feedback.push({ text: 'Contains special character', met: true });
     } else {
