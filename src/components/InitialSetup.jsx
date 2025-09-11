@@ -6,6 +6,7 @@ import { auth, db } from '../services/firebaseConfig';
 import SetupCompletionModal from './SetupCompletionModal';
 import { SuccessModal, ErrorModal, InfoModal } from './Modal';
 import LoadingModal from './LoadingModal';
+import PasswordStrength from './PasswordStrength';
 import { useNotification } from '../hooks/useNotification';
 
 const InitialSetup = ({ onComplete, onBack }) => {
@@ -327,13 +328,28 @@ const InitialSetup = ({ onComplete, onBack }) => {
     delete window.tempSetupData;
   };
 
+  // Password strength validation
+  const isPasswordStrong = (password) => {
+    if (!password) return false;
+    
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[a-z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) score++;
+    
+    return score >= 3; // Require at least 3 out of 5 criteria
+  };
+
   const isStepValid = (step) => {
     switch (step) {
       case 1:
         return formData.companyName && formData.companyEmail && formData.industry;
       case 2:
         return formData.adminName && formData.adminUsername && formData.adminEmail && formData.adminPassword && 
-               formData.confirmPassword && formData.adminPassword === formData.confirmPassword;
+               formData.confirmPassword && formData.adminPassword === formData.confirmPassword &&
+               isPasswordStrong(formData.adminPassword);
       case 3:
         return formData.currency && formData.payFrequency;
       case 4:
@@ -550,6 +566,10 @@ const InitialSetup = ({ onComplete, onBack }) => {
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Create a secure password"
                   required
+                />
+                <PasswordStrength 
+                  password={formData.adminPassword} 
+                  showStrength={formData.adminPassword.length > 0}
                 />
               </div>
 

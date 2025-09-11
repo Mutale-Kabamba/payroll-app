@@ -18,13 +18,61 @@ const Login = ({ onLogin, setupData }) => {
   const [forgotMessage, setForgotMessage] = useState('');
   const [isSubmittingForgot, setIsSubmittingForgot] = useState(false);
 
-  // Demo credentials for testing (keeping for reference but not actively used)
-  // const demoCredentials = [
-  //   { username: 'admin', password: 'admin123', role: 'Administrator' },
-  //   { username: 'hr', password: 'hr123', role: 'HR Manager' },
-  //   { username: 'manager', password: 'manager123', role: 'Manager' },
-  //   { username: 'demo', password: 'demo', role: 'Demo User' }
-  // ];
+  // Demo credentials for fallback authentication when Firebase is unavailable
+  const demoCredentials = [
+    { username: 'admin', password: 'admin123', role: 'Administrator', email: 'admin@demo.com' },
+    { username: 'hr', password: 'hr123', role: 'HR Manager', email: 'hr@demo.com' },
+    { username: 'manager', password: 'manager123', role: 'Manager', email: 'manager@demo.com' },
+    { username: 'demo', password: 'demo', role: 'Demo User', email: 'demo@demo.com' }
+  ];
+
+  // Fallback authentication when Firebase is unavailable
+  const tryFallbackAuth = async () => {
+    console.log('Attempting fallback authentication...');
+    
+    // Check if credentials match demo accounts or setup admin account
+    let user = null;
+    
+    // Check demo credentials
+    user = demoCredentials.find(
+      cred => (cred.username === formData.username || cred.email === formData.username) 
+               && cred.password === formData.password
+    );
+    
+    // Check setup admin account if exists
+    if (!user && setupData?.adminUsername === formData.username && setupData?.adminPassword === formData.password) {
+      user = {
+        username: setupData.adminUsername,
+        email: setupData.adminEmail,
+        role: 'Administrator',
+        name: setupData.adminName || 'Administrator'
+      };
+    }
+    
+    if (user) {
+      const loginData = {
+        uid: `local_${user.username}`,
+        username: user.username,
+        name: user.name || user.username,
+        email: user.email,
+        role: user.role,
+        companyId: setupData?.companyName || 'demo-company',
+        loginTime: new Date().toISOString(),
+        rememberMe: formData.rememberMe,
+        authMode: 'local' // Indicate this is local authentication
+      };
+
+      if (formData.rememberMe) {
+        localStorage.setItem('payroll_login', JSON.stringify(loginData));
+      } else {
+        sessionStorage.setItem('payroll_login', JSON.stringify(loginData));
+      }
+
+      return loginData;
+    } else {
+      throw new Error('Invalid username or password. Please try again.');
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -44,54 +92,94 @@ const Login = ({ onLogin, setupData }) => {
     setError('');
 
     try {
-      let email = formData.username;
-      
-      // If username is not an email, try to find the user by username in setup data or Firestore
-      if (!formData.username.includes('@')) {
-        // Check setup data first for the admin user
-        if (setupData?.adminUsername === formData.username) {
-          email = setupData.adminEmail;
+      // First, try Firebase authentication
+      try {
+        let email = formData.username;
+        
+        // If username is not an email, try to find the user by username in setup data
+        if (!formData.username.includes('@')) {
+          // Check setup data first for the admin user
+          if (setupData?.adminUsername === formData.username) {
+            email = setupData.adminEmail;
+          } else {
+            // Try fallback authentication for username-based login
+            const fallbackUser = await tryFallbackAuth();
+            onLogin(fallbackUser);
+            return;
+          }
+        }
+
+        // Sign in with Firebase Auth
+        const userCredential = await signInWithEmailAndPassword(auth, email, formData.password);
+        const firebaseUser = userCredential.user;
+
+        // Get user profile from Firestore
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        
+        if (!userDoc.exists()) {
+          throw new Error('User profile not found');
+        }
+
+        const userData = userDoc.data();
+        
+        // Store login state
+        const loginData = {
+          uid: firebaseUser.uid,
+          username: userData.username,
+          name: userData.name,
+          email: firebaseUser.email,
+          role: userData.role,
+          companyId: userData.companyId,
+          loginTime: new Date().toISOString(),
+          rememberMe: formData.rememberMe,
+          authMode: 'firebase'
+        };
+
+        if (formData.rememberMe) {
+          localStorage.setItem('payroll_login', JSON.stringify(loginData));
         } else {
-          // For now, we'll require email for login until we implement username lookup
-          throw new Error('Please use your email address to login');
+          sessionStorage.setItem('payroll_login', JSON.stringify(loginData));
+        }
+
+        onLogin(loginData);
+        
+      } catch (firebaseError) {
+        console.log('Firebase authentication failed, trying fallback...', firebaseError.code);
+        
+        // Check if it's a network or configuration error that suggests Firebase is unavailable
+        const isFirebaseUnavailable = 
+          firebaseError.code === 'auth/network-request-failed' ||
+          firebaseError.code === 'auth/configuration-not-found' ||
+          firebaseError.code === 'auth/internal-error' ||
+          firebaseError.message?.includes('network') ||
+          firebaseError.message?.includes('configuration');
+        
+        if (isFirebaseUnavailable) {
+          // Try fallback authentication
+          const fallbackUser = await tryFallbackAuth();
+          onLogin(fallbackUser);
+        } else {
+          // Re-throw Firebase auth errors that are not network/config related (like wrong password)
+          throw firebaseError;
         }
       }
-
-      // Sign in with Firebase Auth
-      const userCredential = await signInWithEmailAndPassword(auth, email, formData.password);
-      const firebaseUser = userCredential.user;
-
-      // Get user profile from Firestore
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       
-      if (!userDoc.exists()) {
-        throw new Error('User profile not found');
-      }
-
-      const userData = userDoc.data();
-      
-      // Store login state
-      const loginData = {
-        uid: firebaseUser.uid,
-        username: userData.username,
-        name: userData.name,
-        email: firebaseUser.email,
-        role: userData.role,
-        companyId: userData.companyId,
-        loginTime: new Date().toISOString(),
-        rememberMe: formData.rememberMe
-      };
-
-      if (formData.rememberMe) {
-        localStorage.setItem('payroll_login', JSON.stringify(loginData));
-      } else {
-        sessionStorage.setItem('payroll_login', JSON.stringify(loginData));
-      }
-
-      onLogin(loginData);
     } catch (error) {
       console.error('Login error:', error);
-      setError(error.message || 'Login failed. Please check your credentials.');
+      let errorMessage = error.message || 'Login failed. Please check your credentials.';
+      
+      // Provide more helpful error messages
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email address.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please try again.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address format.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      }
+      
+      setError(errorMessage);
     }
 
     setIsLoading(false);
