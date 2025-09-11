@@ -48,18 +48,25 @@ class CloudDatabaseService {
 
   async addEmployee(employee) {
     try {
+      // Add timeout to Firebase operations for better UX
       const employeeRef = doc(db, this.getCompanyDocPath('employees'), employee.id);
-      await setDoc(employeeRef, {
-        ...employee,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
+      await Promise.race([
+        setDoc(employeeRef, {
+          ...employee,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Firebase timeout')), 10000)
+        )
+      ]);
       
+      console.log('✅ Employee saved to Firebase successfully');
       // Also save to localStorage as backup
       this.saveLocalEmployee(employee);
       return true;
     } catch (error) {
-      console.error('Error adding employee:', error);
+      console.warn('⚠️ Firebase add employee failed:', error.message);
       // Fallback to localStorage
       return this.saveLocalEmployee(employee);
     }
@@ -329,12 +336,17 @@ class CloudDatabaseService {
   // Check connection status
   async isOnline() {
     try {
-      // Try to read a simple document to check connection
+      // Try to read a simple document to check connection with timeout
       const testRef = doc(db, 'test', 'connection');
-      await getDoc(testRef);
+      await Promise.race([
+        getDoc(testRef),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Connection timeout')), 5000)
+        )
+      ]);
       return true;
-    } catch {
-      // Error handled silently
+    } catch (error) {
+      console.log('Firebase connection test failed:', error.message);
       return false;
     }
   }
