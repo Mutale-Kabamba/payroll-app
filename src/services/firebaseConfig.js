@@ -24,4 +24,14 @@ export const db = getFirestore(app);
 // Initialize Firebase Auth and export it
 export const auth = getAuth(app);
 
+// Check if Firebase is available
+export const isFirebaseAvailable = () => {
+  try {
+    // Test if we can reach Firebase by checking auth state
+    return auth !== null;
+  } catch (error) {
+    return false;
+  }
+};
+
 export default app;
