@@ -20,6 +20,8 @@ const [selectedEmployeeForPayslip, setSelectedEmployeeForPayslip] = useState('')
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 const [showEmployeeForm, setShowEmployeeForm] = useState(false);
 const [isCreatingPayslip, setIsCreatingPayslip] = useState(false);
+const [editingEmployeeId, setEditingEmployeeId] = useState(null);
+const [isEditMode, setIsEditMode] = useState(false);
 
 // Search functionality
 const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
@@ -165,6 +167,12 @@ const getAvailablePeriods = () => {
 
 // Employee Management Functions
 const handleAddEmployee = async () => {
+    if (isEditMode) {
+        // If in edit mode, call update function instead
+        await handleUpdateEmployee();
+        return;
+    }
+    
     if (!newEmployee.id.trim()) {
         showError('Employee ID is required', 'Validation Error');
         return;
@@ -232,6 +240,125 @@ const handleAddEmployee = async () => {
         console.error('Error adding employee:', error);
         showError(error.message || 'Failed to add employee', 'Add Employee Failed');
     }
+};
+
+const handleEditEmployee = (employeeId) => {
+    const employee = employeeDatabase.find(emp => emp.id === employeeId);
+    if (!employee) {
+        showError('Employee not found', 'Edit Error');
+        return;
+    }
+    
+    // Populate the form with existing employee data
+    setNewEmployee({
+        id: employee.id,
+        name: employee.name,
+        nrc: employee.nrc || '',
+        ssn: employee.ssn || '',
+        gender: employee.gender || 'Male',
+        designation: employee.designation,
+        dateOfJoining: employee.dateOfJoining || '',
+        basicPay: employee.basicPay.toString(),
+        transportAllowance: employee.transportAllowance.toString(),
+        mealAllowance: employee.mealAllowance.toString(),
+        address: employee.address || '',
+        department: employee.department || '',
+        napsa: employee.napsa || '',
+        nhima: employee.nhima || ''
+    });
+    
+    setEditingEmployeeId(employeeId);
+    setIsEditMode(true);
+    setShowEmployeeForm(true);
+};
+
+const handleUpdateEmployee = async () => {
+    if (!editingEmployeeId) {
+        showError('No employee selected for editing', 'Update Error');
+        return;
+    }
+    
+    if (!newEmployee.name.trim()) {
+        showError('Employee name is required', 'Validation Error');
+        return;
+    }
+
+    if (!newEmployee.designation.trim()) {
+        showError('Employee designation is required', 'Validation Error');
+        return;
+    }
+
+    try {
+        // Prepare employee data
+        const employeeData = {
+            ...newEmployee,
+            basicPay: parseFloat(newEmployee.basicPay) || 0,
+            transportAllowance: parseFloat(newEmployee.transportAllowance) || 0,
+            mealAllowance: parseFloat(newEmployee.mealAllowance) || 0,
+            updatedAt: new Date().toISOString()
+        };
+
+        showLoading('Updating employee...');
+
+        // Update employee in database
+        await syncDatabaseService.updateEmployee(editingEmployeeId, employeeData);
+        
+        // Update local state
+        const updatedEmployees = await syncDatabaseService.getEmployees();
+        setEmployeeDatabase(updatedEmployees);
+        
+        // Reset form and states
+        setNewEmployee({
+            id: '',
+            name: '',
+            nrc: '',
+            ssn: '',
+            gender: 'Male',
+            designation: '',
+            dateOfJoining: '',
+            basicPay: '',
+            transportAllowance: '',
+            mealAllowance: '',
+            address: '',
+            department: '',
+            napsa: '',
+            nhima: ''
+        });
+        
+        setShowEmployeeForm(false);
+        setIsEditMode(false);
+        setEditingEmployeeId(null);
+        hideLoading();
+        showSuccess(`Employee ${employeeData.name} has been updated successfully!`, 'Employee Updated');
+    } catch (error) {
+        hideLoading();
+        console.error('Error updating employee:', error);
+        showError(error.message || 'Failed to update employee', 'Update Employee Failed');
+    }
+};
+
+const handleCancelEdit = () => {
+    // Reset form and states
+    setNewEmployee({
+        id: '',
+        name: '',
+        nrc: '',
+        ssn: '',
+        gender: 'Male',
+        designation: '',
+        dateOfJoining: '',
+        basicPay: '',
+        transportAllowance: '',
+        mealAllowance: '',
+        address: '',
+        department: '',
+        napsa: '',
+        nhima: ''
+    });
+    
+    setShowEmployeeForm(false);
+    setIsEditMode(false);
+    setEditingEmployeeId(null);
 };
 
 const handleDeleteEmployee = async (employeeId) => {
@@ -3276,7 +3403,20 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                 />
               </label>
               <button
-                onClick={() => setShowEmployeeForm(!showEmployeeForm)}
+                onClick={() => {
+                  if (showEmployeeForm && !isEditMode) {
+                    // If form is open and not in edit mode, just close it
+                    setShowEmployeeForm(false);
+                  } else if (showEmployeeForm && isEditMode) {
+                    // If form is open and in edit mode, cancel edit
+                    handleCancelEdit();
+                  } else {
+                    // If form is closed, open it in add mode
+                    setIsEditMode(false);
+                    setEditingEmployeeId(null);
+                    setShowEmployeeForm(true);
+                  }
+                }}
                 className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
               >
                 <Plus className="h-4 w-4" />
@@ -3288,7 +3428,9 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
           {/* Add Employee Form */}
           {showEmployeeForm && (
             <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
-              <h4 className="font-semibold text-gray-800 mb-4">Add New Employee</h4>
+              <h4 className="font-semibold text-gray-800 mb-4">
+                {isEditMode ? 'Edit Employee' : 'Add New Employee'}
+              </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID *</label>
@@ -3298,7 +3440,11 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     onChange={(e) => setNewEmployee({...newEmployee, id: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="e.g., EMP001"
+                    disabled={isEditMode} // Disable ID field when editing
                   />
+                  {isEditMode && (
+                    <p className="text-xs text-gray-500 mt-1">Employee ID cannot be changed</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
@@ -3416,7 +3562,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
               </div>
               <div className="mt-4 flex justify-end gap-3">
                 <button
-                  onClick={() => setShowEmployeeForm(false)}
+                  onClick={handleCancelEdit}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
@@ -3425,7 +3571,7 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                   onClick={handleAddEmployee}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
-                  Add Employee
+                  {isEditMode ? 'Update Employee' : 'Add Employee'}
                 </button>
               </div>
             </div>
@@ -3468,13 +3614,22 @@ calculatedHouseRent + employee.mealAllowance + otherEarningsTotal;
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{employee.designation}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">ZMW {employee.basicPay.toFixed(2)}</td>
                     <td className="px-3 py-2 whitespace-nowrap text-sm">
-                      <button
-                        onClick={() => handleDeleteEmployee(employee.id)}
-                        className="text-red-600 hover:text-red-900 transition-colors"
-                        title="Delete Employee"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleEditEmployee(employee.id)}
+                          className="text-blue-600 hover:text-blue-900 transition-colors"
+                          title="Edit Employee"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEmployee(employee.id)}
+                          className="text-red-600 hover:text-red-900 transition-colors"
+                          title="Delete Employee"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

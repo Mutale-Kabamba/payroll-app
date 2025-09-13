@@ -93,9 +93,13 @@ class SyncDatabaseService {
           // Update local storage with cloud data for offline access
           if (cloudEmployees.length > 0) {
             this.localService.setEmployees(cloudEmployees);
+            return cloudEmployees;
+          } else {
+            // If Firebase is empty, check local storage for existing data
+            const localEmployees = this.localService.getEmployees();
+            console.log('Firebase empty, checking local employees:', localEmployees);
+            return localEmployees;
           }
-          
-          return cloudEmployees; // Return Firebase data only, even if empty
         } catch (cloudError) {
           console.error('Cloud service error, falling back to local:', cloudError);
           return this.localService.getEmployees();
